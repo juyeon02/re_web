@@ -184,7 +184,12 @@ def draw_choropleth_map(korea_geojson, map_data, legend_title):
 
     # --- GeoJSON에 한글 이름도 추가 (툴팁용) ---
     data_dict = map_data.set_index('geojson_name')['태양광']
-    korean_name_dict = map_data.set_index('geojson_name')['광역지_자체']
+    
+    # -----------------------------------------------------------------
+    # ✨ [KeyError 오타 수정] 광역지_자체 -> 광역지자체
+    # -----------------------------------------------------------------
+    korean_name_dict = map_data.set_index('geojson_name')['광역지자체']
+    # -----------------------------------------------------------------
 
     for feature in local_korea_geojson['features']:
         name = feature['properties']['NAME_1'] # (영어 이름)
