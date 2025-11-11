@@ -1,4 +1,4 @@
-# utils.py
+# utils.py (디버그 모드)
 import streamlit as st
 import pandas as pd
 import folium
@@ -6,20 +6,66 @@ import json
 import datetime
 import copy
 import plotly.express as px
-import glob  # 파일 검색을 위해 추가
-import os    # 파일 경로/이름 처리를 위해 추가
+import glob  
+import os    
 
 # -----------------------------------------------------------------
 # 2. 데이터 로드 (모든 파일)
-# (이 부분은 이전과 동일합니다)
 # -----------------------------------------------------------------
 @st.cache_data
 def load_data():
+    
+    # -----------------------------------------------------------------
+    # ✨ [디버그 코드] 서버가 보는 파일/폴더 목록을 강제로 출력
+    # -----------------------------------------------------------------
+    st.title("🐞 디버그 모드")
+    
+    # 1. 현재 스크립트가 실행되는 위치
+    cwd = os.getcwd()
+    st.subheader("1. 현재 작업 폴더 (os.getcwd())")
+    st.info(cwd) # (예: /mount/src/re_web)
+
+    # 2. 현재 폴더에 있는 모든 파일/폴더
+    st.subheader(f"2. '{cwd}' 안의 모든 파일/폴더 (os.listdir)")
+    try:
+        st.code(str(os.listdir(cwd))) 
+        # (결과에 'data', 'solar_analysis', 'web.py', 'utils.py' 등이 보여야 함)
+    except Exception as e:
+        st.error(f"os.listdir('.') 실행 오류: {e}")
+
+    # 3. 'solar_analysis' 폴더 안의 내용
+    st.subheader("3. 'solar_analysis' 폴더 안의 내용 (os.listdir)")
+    solar_path = "solar_analysis"
+    try:
+        st.code(str(os.listdir(solar_path)))
+        # (결과에 '2020_solar_utf8.csv' 등이 보여야 함)
+    except Exception as e:
+        st.error(f"'solar_analysis' 폴더를 찾는 중 오류: {e}")
+
+    # 4. 'data' 폴더 안의 내용
+    st.subheader("4. 'data' 폴더 안의 내용 (os.listdir)")
+    data_path = "data"
+    try:
+        st.code(str(os.listdir(data_path)))
+        # (결과에 'locations_원본.csv' 등이 보여야 함)
+    except Exception as e:
+        st.error(f"'data' 폴더를 찾는 중 오류: {e}")
+
+    # 5. Glob가 실제로 찾는 파일 목록
+    st.subheader("5. Glob가 solar_analysis에서 찾는 파일 (glob.glob)")
+    glob_path = os.path.join(solar_path, "*_solar_utf8.csv")
+    try:
+        file_list = glob.glob(glob_path)
+        st.code(str(file_list)) # (결과에 ['solar_analysis/2020_solar_utf8.csv', ...] 가 보여야 함)
+    except Exception as e:
+        st.error(f"glob.glob 실행 오류: {e}")
+
+    # -----------------------------------------------------------------
+    # (여기부터는 기존 코드)
+    # -----------------------------------------------------------------
     try:
         # 발전소 위치 (UTF-8)
         df_locations = pd.read_csv("data/locations_원본.csv")
-        df_locations['발전기명'] = df_locations['발전기명'].str.strip()
-
         # 과거 발전량
         df_generation = pd.read_csv("data/동서+중부(이상치제거).csv")
 
@@ -28,14 +74,13 @@ def load_data():
         file_list = glob.glob(os.path.join(path, "*_solar_utf8.csv"))
         
         if not file_list:
-            st.error(f"'{path}' 폴더에서 태양광 CSV 파일을 찾을 수 없습니다.")
+            st.error(f"'{path}' 폴더에서 태양광 CSV 파일을 찾을 수 없습니다. (여기서 멈춤)")
             st.stop()
             
         all_solar_data = []
         
         for file_path in file_list:
             filename = os.path.basename(file_path)
-            # 파일 이름에서 연도 추출 (e.g., "2020_solar_utf8.csv" -> 2020)
             try:
                 year = int(filename.split('_')[0])
             except:
@@ -45,45 +90,34 @@ def load_data():
             df = pd.read_csv(file_path)
             df = df.rename(columns={'구분': '광역지자체'})
             
-            # 월별 컬럼(1월~12월)의 쉼표 제거 및 숫자 변환
             month_cols = [f'{i}월' for i in range(1, 13)]
             for col in month_cols:
                 if col in df.columns:
                     df[col] = df[col].astype(str).str.replace(',', '')
                     df[col] = pd.to_numeric(df[col], errors='coerce')
             
-            # (Wide -> Long) Tidy 데이터로 변환
             df_long = df.melt(id_vars=['광역지자체'], 
                               value_vars=month_cols, 
                               var_name='월', 
                               value_name='태양광')
             
             df_long['연도'] = year
-            # '월' 컬럼을 숫자로 변경 (e.g., "1월" -> 1)
             df_long['월'] = df_long['월'].str.replace('월', '').astype(int)
-            
             all_solar_data.append(df_long)
 
-        # 모든 연도 데이터를 하나의 DataFrame으로 합치기
         df_region_solar_monthly = pd.concat(all_solar_data, ignore_index=True)
-        df_region_solar_monthly['광역지자체'] = df_region_solar_monthly['광역지자체'].str.strip()
-        
-        # [중요] 기존 코드를 위한 '연간' 합계 데이터 생성
         df_region_solar_annual = df_region_solar_monthly.groupby(
             ['연도', '광역지자체']
         )['태양광'].sum().reset_index()
-
-        # ---------------------------------------------------
         
-        # (신규) 한국 지도 경계선
         with open('data/korea_geojson.json', 'r', encoding='utf-8') as f:
             korea_geojson = json.load(f)
 
     except FileNotFoundError as e:
-        st.error(f"필수 파일을 찾을 수 없습니다: {e.filename}. (data/ 폴더에 있는지 확인하세요)")
+        st.error(f"필수 파일을 찾을 수 없습니다: {e.filename}. (data/ 또는 solar_analysis/ 폴더를 확인하세요)")
         st.stop()
 
-    # 날씨 예보 (파일이 없어도 앱이 멈추지 않도록)
+    # (이후 코드는 동일)
     try:
         df_today_forecast = pd.read_csv("data/today_forecast_3hourly_final.csv")
         df_today_forecast['발전기명'] = df_today_forecast['발전기명'].str.strip()
@@ -91,14 +125,11 @@ def load_data():
         st.warning("`data/today_forecast_3hourly_final.csv` 파일이 없습니다.")
         df_today_forecast = pd.DataFrame()
 
-    # [수정] '연간' 데이터와 '월간' 데이터를 모두 반환
     return df_locations, df_generation, df_region_solar_annual, korea_geojson, df_today_forecast, df_region_solar_monthly
 
 
-# -----------------------------------------------------------------
-# 3. 날씨 데이터 처리 (공통)
-# (이 부분은 이전과 동일합니다)
-# -----------------------------------------------------------------
+# (이후 draw_choropleth_map 등 나머지 함수는 그대로 둠)
+# ... (기존 utils.py의 나머지 함수들) ...
 def process_weather_data(df_today_forecast, df_locations):
     weather_data_available = False
     df_current_weather = pd.DataFrame()
@@ -117,12 +148,6 @@ def process_weather_data(df_today_forecast, df_locations):
             
     return df_current_weather, weather_data_available
 
-# -----------------------------------------------------------------
-# 4. 헬퍼 함수 (지도 그리기용)
-# -----------------------------------------------------------------
-
-# (공통) 날씨 아이콘 그리는 함수
-# (이 부분은 이전과 동일합니다)
 def create_weather_icon(row):
     temp = row.get('기온(°C)', 0)
     insolation = row.get('일사량(MJ/m²)', 0)
@@ -149,10 +174,8 @@ def create_weather_icon(row):
         icon_size=(100, 50), icon_anchor=(50, 25), html=html
     )
 
-# (신규) 색칠 지도(Choropleth) 그리는 함수
 def draw_choropleth_map(korea_geojson, map_data, legend_title):
     
-    # (안정적인 OpenStreetMap 사용)
     m = folium.Map(
         location=[36.5, 127.5], 
         zoom_start=7, 
@@ -185,19 +208,13 @@ def draw_choropleth_map(korea_geojson, map_data, legend_title):
     if map_data['geojson_name'].isnull().any():
         st.warning(f"일부 지역 이름이 지도와 매칭되지 않습니다: {map_data[map_data['geojson_name'].isnull()]['광역지자체'].unique()}")
 
-    # --- GeoJSON에 한글 이름도 추가 (툴팁용) ---
     data_dict = map_data.set_index('geojson_name')['태양광']
     korean_name_dict = map_data.set_index('geojson_name')['광역지자체']
 
     for feature in local_korea_geojson['features']:
         name = feature['properties']['NAME_1'] # (영어 이름)
         feature['properties']['태양광'] = float(data_dict.get(name, 0))
-        
-        # -----------------------------------------------------------------
-        # ✨ [오류 수정] str()로 감싸서 NaN 값도 "N/A" 또는 "nan" 문자열로 변환
-        # -----------------------------------------------------------------
         feature['properties']['KOREAN_NAME'] = str(korean_name_dict.get(name, 'N/A'))
-        # -----------------------------------------------------------------
 
     c = folium.Choropleth(
         geo_data=local_korea_geojson,
@@ -212,7 +229,6 @@ def draw_choropleth_map(korea_geojson, map_data, legend_title):
         highlight=True,
     ).add_to(m)
 
-    # --- 툴팁이 KOREAN_NAME을 보도록 변경 ---
     folium.GeoJsonTooltip(
         fields=['KOREAN_NAME', '태양광'],
         aliases=['지역:', '발전량(MWh):'],
@@ -229,8 +245,6 @@ def draw_choropleth_map(korea_geojson, map_data, legend_title):
 
     return m
 
-# (기존) 날씨 지도 그리는 함수
-# (이 부분은 이전과 동일합니다)
 def draw_plant_weather_map(df_current_weather, weather_data_available, company_filter):
     m = folium.Map(location=[36.5, 127.5], zoom_start=7)
 
