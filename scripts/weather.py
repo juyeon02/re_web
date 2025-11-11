@@ -2,9 +2,12 @@ import pandas as pd
 import requests
 import io
 import time
+import os
+from dotenv import load_dotenv
+dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+load_dotenv(dotenv_path=dotenv_path)
 
-# --- 파라미터 ---
-AUTH_KEY = "vLfGjQIPTia3xo0CD94muA"
+AUTH_KEY = os.getenv("MY_API_KEY")
 INTERVAL = 30 
 INPUT_FILE = "locations.csv"
 INPUT_ENCODING = "cp949" 

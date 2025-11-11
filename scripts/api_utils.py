@@ -5,6 +5,12 @@ import pandas as pd
 import requests
 import time
 import datetime
+import os
+from dotenv import load_dotenv
+dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+load_dotenv(dotenv_path=dotenv_path)
+
+
 
 # -----------------------------------------------------------------
 # ✨ 1시간 캐시가 적용된 API 호출 함수
@@ -18,7 +24,7 @@ def get_today_forecast(df_locations_for_api):
     """
     
     # --- 1. 파라미터 설정 ---
-    AUTH_KEY = "vLfGjQIPTia3xo0CD94muA" # 사용자 API 키
+    AUTH_KEY = os.getenv("MY_API_KEY")
     BASE_URL = "https://apihub.kma.go.kr/api/typ01/cgi-bin/url/nph_sun_nwp_txt"
     CONVERSION_FACTOR = (3 * 3600) / 1000000 
     VARIABLES_TO_FETCH = {

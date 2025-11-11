@@ -4,9 +4,12 @@ import pandas as pd
 import requests
 import time
 import datetime
+import os
+from dotenv import load_dotenv
+dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+load_dotenv(dotenv_path=dotenv_path)
 
-# --- 1. 파라미터 설정 ---
-AUTH_KEY = "vLfGjQIPTia3xo0CD94muA"
+AUTH_KEY = os.getenv("MY_API_KEY")
 INPUT_FILE = "locations_원본.csv"
 OUTPUT_FILE = "today_forecast_3hourly_final.csv" # 최종 저장 파일
 BASE_URL = "https://apihub.kma.go.kr/api/typ01/cgi-bin/url/nph_sun_nwp_txt"

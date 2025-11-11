@@ -22,14 +22,14 @@ st.title("☀️ 태양광 발전량 대시보드 ☀️")
 def load_data():
     try:
         # 발전소 위치 (UTF-8)
-        df_locations = pd.read_csv("locations_원본.csv")
+        df_locations = pd.read_csv("data/locations_원본.csv")
         df_locations['발전기명'] = df_locations['발전기명'].str.strip()
 
         # 과거 발전량
-        df_generation = pd.read_csv("동서+중부(이상치제거).csv")
+        df_generation = pd.read_csv("data/동서+중부(이상치제거).csv")
 
         # (신규) 지역별 연도별 발전량 (UTF-8)
-        df_region_solar = pd.read_csv("지역별_연도별_태양광.csv")
+        df_region_solar = pd.read_csv("data/지역별_연도별_태양광.csv")
         df_region_solar['광역지자체'] = df_region_solar['광역지자체'].str.strip()
 
         # 쉼표(,) 제거 및 숫자로 변환
@@ -37,7 +37,7 @@ def load_data():
         df_region_solar['태양광'] = pd.to_numeric(df_region_solar['태양광'])
 
         # (신규) 한국 지도 경계선
-        with open('korea_geojson.json', 'r', encoding='utf-8') as f:
+        with open('data/korea_geojson.json', 'r', encoding='utf-8') as f:
             korea_geojson = json.load(f)
 
     except FileNotFoundError as e:
@@ -46,7 +46,7 @@ def load_data():
 
     # 날씨 예보 (파일이 없어도 앱이 멈추지 않도록)
     try:
-        df_today_forecast = pd.read_csv("today_forecast_3hourly_final.csv")
+        df_today_forecast = pd.read_csv("data/today_forecast_3hourly_final.csv")
         df_today_forecast['발전기명'] = df_today_forecast['발전기명'].str.strip()
     except FileNotFoundError:
         st.warning("`today_forecast_3hourly_final.csv` 파일이 없습니다. (날씨 정보가 표시되지 않습니다)")
