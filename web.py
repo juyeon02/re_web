@@ -5,6 +5,7 @@ from streamlit_folium import st_folium
 import plotly.express as px
 import datetime
 import json
+import copy  # GeoJSON을 복사하기 위해 import
 
 # -----------------------------------------------------------------
 # 1. 웹페이지 설정
@@ -116,61 +117,70 @@ def draw_choropleth_map(data, year):
     map_data = data[data['연도'] == year].copy()
     m = folium.Map(location=[36.5, 127.5], zoom_start=7, tiles="CartoDB positron")
 
+    # 원본 GeoJSON이 훼손되지 않도록 깊은 복사 (중요)
+    local_korea_geojson = copy.deepcopy(korea_geojson)
+
     if map_data.empty:
         st.warning(f"{year}년도 데이터가 없습니다.")
         return m
 
-    # --- ✨ [핵심 수정] CSV(한글) -> GeoJSON(영어) 이름 매칭 ---
+    # --- CSV(한글) -> GeoJSON(영어) 이름 매칭 ---
     name_mapping = {
-        # CSV 파일의 이름 : GeoJSON 파일의 이름
-        '서울': 'Seoul',
-        '부산': 'Busan',
-        '대구': 'Daegu',
-        '인천': 'Incheon',
-        '광주': 'Gwangju',
-        '대전': 'Daejeon',
-        '울산': 'Ulsan',
-        '세종': 'Sejong',
-        '경기': 'Gyeonggi-do',
-        '경기도': 'Gyeonggi-do',
-        '강원': 'Gangwon-do',
-        '강원도': 'Gangwon-do',
-        '강원특별자치도': 'Gangwon-do',  # (GeoJSON이 이전 버전이라 'Gangwon-do'로 매칭)
-        '충북': 'Chungcheongbuk-do',
-        '충청북도': 'Chungcheongbuk-do',
-        '충남': 'Chungcheongnam-do',
-        '충청남도': 'Chungcheongnam-do',
-        '전북': 'Jeollabuk-do',
-        '전라북도': 'Jeollabuk-do',
-        '전남': 'Jeollanam-do',
-        '전라남도': 'Jeollanam-do',
-        '경북': 'Gyeongsangbuk-do',
-        '경상북도': 'Gyeongsangbuk-do',
-        '경남': 'Gyeongsangnam-do',
-        '경상남도': 'Gyeongsangnam-do',
-        '제주': 'Jeju',
-        '제주특별자치도': 'Jeju'
+        '서울': 'Seoul', '부산': 'Busan', '대구': 'Daegu', '인천': 'Incheon',
+        '광주': 'Gwangju', '대전': 'Daejeon', '울산': 'Ulsan', '세종': 'Sejong',
+        '경기': 'Gyeonggi-do', '경기도': 'Gyeonggi-do', '강원': 'Gangwon-do',
+        '강원도': 'Gangwon-do', '강원특별자치도': 'Gangwon-do', '충북': 'Chungcheongbuk-do',
+        '충청북도': 'Chungcheongbuk-do', '충남': 'Chungcheongnam-do',
+        '충청남도': 'Chungcheongnam-do', '전북': 'Jeollabuk-do',
+        '전라북도': 'Jeollabuk-do', '전남': 'Jeollanam-do',
+        '전라남도': 'Jeollanam-do', '경북': 'Gyeongsangbuk-do',
+        '경상북도': 'Gyeongsangbuk-do', '경남': 'Gyeongsangnam-do',
+        '경상남도': 'Gyeongsangnam-do', '제주': 'Jeju', '제주특별자치도': 'Jeju'
     }
 
     map_data['geojson_name'] = map_data['광역지자체'].map(name_mapping)
 
     if map_data['geojson_name'].isnull().any():
         st.warning(f"일부 지역 이름이 지도와 매칭되지 않습니다: {map_data[map_data['geojson_name'].isnull()]['광역지자체'].unique()}")
-    # --- ✨ 수정 끝 ---
 
-    folium.Choropleth(
-        geo_data=korea_geojson,
+    # Tooltip에 발전량 데이터를 표시하기 위해 GeoJSON에 데이터 추가
+    data_dict = map_data.set_index('geojson_name')['태양광']
+    for feature in local_korea_geojson['features']:
+        name = feature['properties']['NAME_1']
+        
+        # ✨✨✨ [오류 수정] NumPy/pandas 타입을 표준 float으로 변환 ✨✨✨
+        feature['properties']['태양광'] = float(data_dict.get(name, 0))
+        # ✨✨✨ [오류 수정] 끝 ✨✨✨
+
+    # Choropleth 그리기 (c 변수에 저장)
+    c = folium.Choropleth(
+        geo_data=local_korea_geojson,  # 데이터가 추가된 local_korea_geojson 사용
         name="choropleth",
         data=map_data,
-        columns=["geojson_name", "태양광"],  # [수정] 매칭된 영어 이름 사용
-        key_on="feature.properties.NAME_1",  # 👈 [수정] 'NAME_1' 키 사용
-
+        columns=["geojson_name", "태양광"],
+        key_on="feature.properties.NAME_1",
         fill_color="YlOrRd",
         fill_opacity=0.7,
         line_opacity=0.3,
         legend_name=f"{year}년 태양광 발전량",
         highlight=True,
     ).add_to(m)
+
+    # 마우스 호버 시(Tooltip) 지역명과 발전량 표시
+    folium.GeoJsonTooltip(
+        fields=['NAME_1', '태양광'],
+        aliases=['지역:', '발전량(MWh):'],
+        localize=True,
+        sticky=False,
+        labels=True,
+        style="""
+            background-color: #F0EFEF;
+            border: 2px solid black;
+            border-radius: 3px;
+            box-shadow: 3px;
+        """,
+        max_width=800,
+    ).add_to(c.geojson)  # Choropleth 객체(c)의 geojson 속성에 Tooltip 추가
 
     return m
 
@@ -280,82 +290,101 @@ elif view_mode == "발전소별 상세 (날씨 지도)":
 
     st.sidebar.title("기간 필터")
 
+    # 원본 df_generation에 날짜 컬럼 생성
     df_generation['날짜'] = pd.to_datetime(df_generation['날짜'])
     df_generation['연도'] = df_generation['날짜'].dt.year
     df_generation['월'] = df_generation['날짜'].dt.month
 
+    # 필터링된 merged_data에도 날짜 컬럼 생성 (이미 생성되었을 수 있음)
     if '연도' not in merged_data.columns:
         merged_data['날짜'] = pd.to_datetime(merged_data['날짜'])
         merged_data['연도'] = merged_data['날짜'].dt.year
         merged_data['월'] = merged_data['날짜'].dt.month
 
+    # 연도 필터
     year_list_gen = ['전체'] + sorted(list(merged_data['연도'].unique()))
     selected_year_gen = st.sidebar.selectbox('연도를 선택하세요:', year_list_gen)
 
+    # 연도에 따라 월 필터 생성
     if selected_year_gen == '전체':
         month_list = ['전체'] + sorted(list(merged_data['월'].unique()))
     else:
         merged_data = merged_data[merged_data['연도'] == selected_year_gen]
         month_list = ['전체'] + sorted(list(merged_data['월'].unique()))
 
+    # 월 필터
     selected_month = st.sidebar.selectbox('월을 선택하세요:', month_list)
 
     if selected_month != '전체':
         merged_data = merged_data[merged_data['월'] == selected_month]
 
+    # --- 동적 그래프 집계 로직 ---
     if merged_data.empty:
         st.warning("선택한 조건의 발전량 데이터가 없습니다.")
     else:
-        daily_gen = merged_data.groupby('날짜')['발전량(MWh)'].sum().reset_index()
+        # 필터 조건에 따라 집계 기준(agg_data)과 차트 X축(x_axis)을 동적으로 변경
+        
+        # 1. 연도와 월 모두 선택: '일별' 집계
+        if selected_year_gen != '전체' and selected_month != '전체':
+            agg_data = merged_data.groupby('날짜')['발전량(MWh)'].sum().reset_index()
+            x_axis = '날짜'
+            title_suffix = f"{selected_year_gen}년 {selected_month}월 (일별)"
+            stat_prefix = "일"  # 통계 라벨
 
-        if selected_year_gen == '전체' and selected_month == '전체':
-            title_suffix = "전체 기간"
+        # 2. 연도만 선택: '월별' 집계
         elif selected_year_gen != '전체' and selected_month == '전체':
-            title_suffix = f"{selected_year_gen}년"
-        elif selected_year_gen != '전체' and selected_month != '전체':
-            title_suffix = f"{selected_year_gen}년 {selected_month}월"
-        else:
-            title_suffix = f"매년 {selected_month}월"
+            agg_data = merged_data.groupby('월')['발전량(MWh)'].sum().reset_index()
+            x_axis = '월'
+            title_suffix = f"{selected_year_gen}년 (월별)"
+            stat_prefix = "월"  # 통계 라벨
 
-        fig = px.line(daily_gen, x='날짜', y='발전량(MWh)',
+        # 3. 연도 미선택 (월만 선택 or 둘 다 미선택): '연도별' 집계
+        else:  # selected_year_gen == '전체'
+            agg_data = merged_data.groupby('연도')['발전량(MWh)'].sum().reset_index()
+            x_axis = '연도'
+            stat_prefix = "연"  # 통계 라벨
+            
+            if selected_month != '전체':
+                title_suffix = f"매년 {selected_month}월 (연도별)"
+            else:
+                title_suffix = "전체 기간 (연도별)"
+
+        # --- 그래프 그리기 ---
+        fig = px.line(agg_data, x=x_axis, y='발전량(MWh)',
                         title=f"{graph_title_name} {title_suffix} 발전량 합계 추이",
                         markers=True)
-        
-        # (수정) use_container_width=True 로 변경하여 반응형 너비 지원
+
+        # x축이 '월' 또는 '연도'일 경우, 소수점이 나오지 않도록 카테고리 타입으로 변경
+        if x_axis in ['월', '연도']:
+            fig.update_xaxes(type='category')
+
         st.plotly_chart(fig, use_container_width=True)
 
-        
-        # -----------------------------------------------------------------
-        # ✨ [요청사항] 요약 통계 및 데이터 테이블 추가 (여기부터)
-        # -----------------------------------------------------------------
-        
-        st.subheader("📈 요약 통계")
+        # --- 요약 통계 표시 (동적 라벨 적용) ---
+        st.subheader(f"📈 {stat_prefix}별 요약 통계")
 
-        # 1. 통계 계산 (daily_gen 사용)
-        total_gen = daily_gen['발전량(MWh)'].sum()
-        avg_gen = daily_gen['발전량(MWh)'].mean()
-        max_gen = daily_gen['발전량(MWh)'].max()
-        min_gen = daily_gen['발전량(MWh)'].min()
+        total_gen = agg_data['발전량(MWh)'].sum()
+        avg_gen = agg_data['발전량(MWh)'].mean()
+        max_gen = agg_data['발전량(MWh)'].max()
+        min_gen = agg_data['발전량(MWh)'].min()
 
-        # 2. st.metric을 사용해 4열로 깔끔하게 표시
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("총 발전량 (MWh)", f"{total_gen:,.2f}")
-        col2.metric("일평균 발전량 (MWh)", f"{avg_gen:,.2f}")
-        col3.metric("일최대 발전량 (MWh)", f"{max_gen:,.2f}")
-        col4.metric("일최소 발전량 (MWh)", f"{min_gen:,.2f}")
+        col2.metric(f"{stat_prefix}평균 발전량 (MWh)", f"{avg_gen:,.2f}")
+        col3.metric(f"{stat_prefix}최대 발전량 (MWh)", f"{max_gen:,.2f}")
+        col4.metric(f"{stat_prefix}최소 발전량 (MWh)", f"{min_gen:,.2f}")
 
-        # 3. st.expander 안에 상세 데이터 '표' (DataFrame) 표시
-        with st.expander("상세 데이터 표 보기 (날짜별 합계)"):
-            # 사용자가 보기 편하도록 날짜 포맷 변경 및 소수점 정리
-            display_df = daily_gen.copy()
-            display_df['날짜'] = display_df['날짜'].dt.strftime('%Y-%m-%d')
+        # --- 상세 데이터 표 (동적 제목 적용) ---
+        with st.expander(f"상세 데이터 표 보기 ({stat_prefix}별 합계)"):
+            display_df = agg_data.copy()
+            
+            # '날짜' 컬럼일 경우 포맷 변경
+            if x_axis == '날짜':
+                display_df['날짜'] = display_df['날짜'].dt.strftime('%Y-%m-%d')
+            
             display_df['발전량(MWh)'] = display_df['발전량(MWh)'].round(2)
             
-            # 최신 날짜순으로 정렬하여 표시
             st.dataframe(
-                display_df.sort_values(by='날짜', ascending=False), 
+                display_df.sort_values(by=x_axis, ascending=False),
                 use_container_width=True
             )
-        # -----------------------------------------------------------------
-        # ✨ [요청사항] 추가된 코드 (여기까지)
-        # -----------------------------------------------------------------
