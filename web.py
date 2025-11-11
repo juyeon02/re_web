@@ -148,9 +148,8 @@ def draw_choropleth_map(data, year):
     for feature in local_korea_geojson['features']:
         name = feature['properties']['NAME_1']
         
-        # ✨✨✨ [오류 수정] NumPy/pandas 타입을 표준 float으로 변환 ✨✨✨
+        # [JSON 오류 수정] NumPy/pandas 타입을 표준 float으로 변환
         feature['properties']['태양광'] = float(data_dict.get(name, 0))
-        # ✨✨✨ [오류 수정] 끝 ✨✨✨
 
     # Choropleth 그리기 (c 변수에 저장)
     c = folium.Choropleth(
@@ -266,6 +265,35 @@ elif view_mode == "발전소별 상세 (날씨 지도)":
         '발전사를 선택하세요:',
         company_list
     )
+
+    # -----------------------------------------------------------------
+    # ✨ [KeyError 오류 수정] '주소' 대신 '위도', '경도'를 표시
+    # -----------------------------------------------------------------
+    if company != '전체':
+        # 1. 해당 발전사의 발전소 목록 필터링
+        # (오류 수정) '주소' 컬럼이 없을 수 있으므로 '위도', '경도'로 대체
+        
+        # 표시할 컬럼 목록 (발전기명은 필수)
+        display_columns = ['발전기명']
+        
+        # 'locations_원본.csv' 파일에 '위도', '경도'가 있는지 확인
+        if '위도' in df_locations.columns and '경도' in df_locations.columns:
+            display_columns.extend(['위도', '경도'])
+        
+        # (만약 '주소' 컬럼이 있다면 '주소'를 추가 - 선택 사항)
+        # if '주소' in df_locations.columns:
+        #     display_columns.append('주소')
+
+        plant_list_df = df_locations[df_locations['발전사'] == company][display_columns]
+        plant_list_df = plant_list_df.reset_index(drop=True)
+        plant_list_df.index += 1  # 목록 번호를 1부터 시작하게
+
+        # 2. st.expander를 사용해 목록 표시
+        with st.expander(f"✅ {company} 소속 발전소 목록 (총 {len(plant_list_df)}개)"):
+            st.dataframe(plant_list_df, use_container_width=True)
+    # -----------------------------------------------------------------
+    # ✨ [수정] (여기까지)
+    # -----------------------------------------------------------------
 
     m_weather, filtered_weather_data = draw_plant_weather_map(company)
     map_data = st_folium(m_weather, width=1200, height=500)
