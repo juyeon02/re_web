@@ -6,27 +6,76 @@ import json
 import datetime
 import copy
 import plotly.express as px
+import glob  # 파일 검색을 위해 추가
+import os    # 파일 경로/이름 처리를 위해 추가
 
 # -----------------------------------------------------------------
 # 2. 데이터 로드 (모든 파일)
+# (이 부분은 이전과 동일합니다)
 # -----------------------------------------------------------------
 @st.cache_data
 def load_data():
     try:
-        # 발전소 위치 (UTF-8) - 경로 수정
+        # 발전소 위치 (UTF-8)
         df_locations = pd.read_csv("data/locations_원본.csv")
         df_locations['발전기명'] = df_locations['발전기명'].str.strip()
 
-        # 과거 발전량 - 경로 수정
+        # 과거 발전량
         df_generation = pd.read_csv("data/동서+중부(이상치제거).csv")
 
-        # 지역별 연도별 발전량 (UTF-8) - 경로 수정
-        df_region_solar = pd.read_csv("data/지역별_연도별_태양광.csv")
-        df_region_solar['광역지자체'] = df_region_solar['광역지자체'].str.strip()
-        df_region_solar['태양광'] = df_region_solar['태양광'].astype(str).str.replace(',', '')
-        df_region_solar['태양광'] = pd.to_numeric(df_region_solar['태양광'])
+        # --- [수정] solar_analysis 폴더의 모든 CSV 읽기 ---
+        path = "solar_analysis/"
+        file_list = glob.glob(os.path.join(path, "*_solar_utf8.csv"))
+        
+        if not file_list:
+            st.error(f"'{path}' 폴더에서 태양광 CSV 파일을 찾을 수 없습니다.")
+            st.stop()
+            
+        all_solar_data = []
+        
+        for file_path in file_list:
+            filename = os.path.basename(file_path)
+            # 파일 이름에서 연도 추출 (e.g., "2020_solar_utf8.csv" -> 2020)
+            try:
+                year = int(filename.split('_')[0])
+            except:
+                st.warning(f"파일 이름 형식이 잘못되었습니다: {filename}. (예: 2020_solar_utf8.csv)")
+                continue
+                
+            df = pd.read_csv(file_path)
+            df = df.rename(columns={'구분': '광역지자체'})
+            
+            # 월별 컬럼(1월~12월)의 쉼표 제거 및 숫자 변환
+            month_cols = [f'{i}월' for i in range(1, 13)]
+            for col in month_cols:
+                if col in df.columns:
+                    df[col] = df[col].astype(str).str.replace(',', '')
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+            
+            # (Wide -> Long) Tidy 데이터로 변환
+            df_long = df.melt(id_vars=['광역지자체'], 
+                              value_vars=month_cols, 
+                              var_name='월', 
+                              value_name='태양광')
+            
+            df_long['연도'] = year
+            # '월' 컬럼을 숫자로 변경 (e.g., "1월" -> 1)
+            df_long['월'] = df_long['월'].str.replace('월', '').astype(int)
+            
+            all_solar_data.append(df_long)
 
-        # 한국 지도 경계선 - 경로 수정
+        # 모든 연도 데이터를 하나의 DataFrame으로 합치기
+        df_region_solar_monthly = pd.concat(all_solar_data, ignore_index=True)
+        df_region_solar_monthly['광역지자체'] = df_region_solar_monthly['광역지자체'].str.strip()
+        
+        # [중요] 기존 코드를 위한 '연간' 합계 데이터 생성
+        df_region_solar_annual = df_region_solar_monthly.groupby(
+            ['연도', '광역지자체']
+        )['태양광'].sum().reset_index()
+
+        # ---------------------------------------------------
+        
+        # (신규) 한국 지도 경계선
         with open('data/korea_geojson.json', 'r', encoding='utf-8') as f:
             korea_geojson = json.load(f)
 
@@ -34,7 +83,7 @@ def load_data():
         st.error(f"필수 파일을 찾을 수 없습니다: {e.filename}. (data/ 폴더에 있는지 확인하세요)")
         st.stop()
 
-    # 날씨 예보 (파일이 없어도 앱이 멈추지 않도록) - 경로 수정
+    # 날씨 예보 (파일이 없어도 앱이 멈추지 않도록)
     try:
         df_today_forecast = pd.read_csv("data/today_forecast_3hourly_final.csv")
         df_today_forecast['발전기명'] = df_today_forecast['발전기명'].str.strip()
@@ -42,12 +91,14 @@ def load_data():
         st.warning("`data/today_forecast_3hourly_final.csv` 파일이 없습니다.")
         df_today_forecast = pd.DataFrame()
 
-    return df_locations, df_generation, df_region_solar, korea_geojson, df_today_forecast
+    # [수정] '연간' 데이터와 '월간' 데이터를 모두 반환
+    return df_locations, df_generation, df_region_solar_annual, korea_geojson, df_today_forecast, df_region_solar_monthly
+
 
 # -----------------------------------------------------------------
 # 3. 날씨 데이터 처리 (공통)
+# (이 부분은 이전과 동일합니다)
 # -----------------------------------------------------------------
-# (✨ 로직을 함수로 변경)
 def process_weather_data(df_today_forecast, df_locations):
     weather_data_available = False
     df_current_weather = pd.DataFrame()
@@ -71,6 +122,7 @@ def process_weather_data(df_today_forecast, df_locations):
 # -----------------------------------------------------------------
 
 # (공통) 날씨 아이콘 그리는 함수
+# (이 부분은 이전과 동일합니다)
 def create_weather_icon(row):
     temp = row.get('기온(°C)', 0)
     insolation = row.get('일사량(MJ/m²)', 0)
@@ -98,14 +150,19 @@ def create_weather_icon(row):
     )
 
 # (신규) 색칠 지도(Choropleth) 그리는 함수
-def draw_choropleth_map(korea_geojson, data, year): # (✨ korea_geojson을 인자로 받도록 수정)
-    map_data = data[data['연도'] == year].copy()
-    m = folium.Map(location=[36.5, 127.5], zoom_start=7, tiles="OpenStreetMap") # (✨ 배경지도 수정)
+def draw_choropleth_map(korea_geojson, map_data, legend_title):
+    
+    # (안정적인 OpenStreetMap 사용)
+    m = folium.Map(
+        location=[36.5, 127.5], 
+        zoom_start=7, 
+        tiles="OpenStreetMap"
+    )
 
     local_korea_geojson = copy.deepcopy(korea_geojson)
 
     if map_data.empty:
-        st.warning(f"{year}년도 데이터가 없습니다.")
+        st.warning(f"선택한 조건의 지도 데이터가 없습니다.")
         return m
 
     name_mapping = {
@@ -120,16 +177,27 @@ def draw_choropleth_map(korea_geojson, data, year): # (✨ korea_geojson을 인�
         '경상북도': 'Gyeongsangbuk-do', '경남': 'Gyeongsangnam-do',
         '경상남도': 'Gyeongsangnam-do', '제주': 'Jeju', '제주특별자치도': 'Jeju'
     }
-
+    
+    map_data = map_data.copy()
+    
     map_data['geojson_name'] = map_data['광역지자체'].map(name_mapping)
 
     if map_data['geojson_name'].isnull().any():
         st.warning(f"일부 지역 이름이 지도와 매칭되지 않습니다: {map_data[map_data['geojson_name'].isnull()]['광역지자체'].unique()}")
 
+    # --- GeoJSON에 한글 이름도 추가 (툴팁용) ---
     data_dict = map_data.set_index('geojson_name')['태양광']
+    korean_name_dict = map_data.set_index('geojson_name')['광역지자체']
+
     for feature in local_korea_geojson['features']:
-        name = feature['properties']['NAME_1']
+        name = feature['properties']['NAME_1'] # (영어 이름)
         feature['properties']['태양광'] = float(data_dict.get(name, 0))
+        
+        # -----------------------------------------------------------------
+        # ✨ [오류 수정] str()로 감싸서 NaN 값도 "N/A" 또는 "nan" 문자열로 변환
+        # -----------------------------------------------------------------
+        feature['properties']['KOREAN_NAME'] = str(korean_name_dict.get(name, 'N/A'))
+        # -----------------------------------------------------------------
 
     c = folium.Choropleth(
         geo_data=local_korea_geojson,
@@ -140,22 +208,30 @@ def draw_choropleth_map(korea_geojson, data, year): # (✨ korea_geojson을 인�
         fill_color="YlOrRd",
         fill_opacity=0.7,
         line_opacity=0.3,
-        legend_name=f"{year}년 태양광 발전량",
+        legend_name=legend_title,
         highlight=True,
     ).add_to(m)
 
+    # --- 툴팁이 KOREAN_NAME을 보도록 변경 ---
     folium.GeoJsonTooltip(
-        fields=['NAME_1', '태양광'],
+        fields=['KOREAN_NAME', '태양광'],
         aliases=['지역:', '발전량(MWh):'],
         localize=True, sticky=False, labels=True,
-        style="background-color: #F0EFEF; border: 2px solid black; border-radius: 3px; box-shadow: 3px;",
+        style="""
+            background-color: #F0EFEF;
+            border: 2px solid black;
+            border-radius: 3px;
+            box-shadow: 3px;
+            font-weight: bold; 
+        """,
         max_width=800,
     ).add_to(c.geojson)
 
     return m
 
 # (기존) 날씨 지도 그리는 함수
-def draw_plant_weather_map(df_current_weather, weather_data_available, company_filter): # (✨ 인자 수정)
+# (이 부분은 이전과 동일합니다)
+def draw_plant_weather_map(df_current_weather, weather_data_available, company_filter):
     m = folium.Map(location=[36.5, 127.5], zoom_start=7)
 
     if company_filter == '전체':

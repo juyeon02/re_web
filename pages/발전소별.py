@@ -1,17 +1,17 @@
-# pages/2_🏭_발전소별_상세.py
+# pages/발전소별.py
 import streamlit as st
-import utils  # (✨ 우리 헬퍼 함수 임포트)
+import utils  
 import pandas as pd
 import plotly.express as px
-from streamlit_folium import st_folium
+from streamlit_folium import st_folium # (임포트 확인)
 
 st.set_page_config(layout="wide")
 st.title("🏭 발전소별 상세 (날씨 지도 및 그래프)")
 
-# (✨ utils.py에서 데이터 로드)
-df_locations, df_generation, df_region_solar, korea_geojson, df_today_forecast = utils.load_data()
+# ( '월간' 데이터프레임도 받도록 변수 추가)
+df_locations, df_generation, df_region_solar, korea_geojson, df_today_forecast, df_region_solar_monthly = utils.load_data()
 
-# (✨ utils.py에서 날씨 데이터 처리)
+# ( utils.py에서 날씨 데이터 처리)
 df_current_weather, weather_data_available = utils.process_weather_data(df_today_forecast, df_locations)
 
 # -----------------------------------------------------------------
@@ -25,7 +25,7 @@ company = st.sidebar.selectbox(
     company_list
 )
 
-# (✨ [KeyError 오류 수정] 부분 반영)
+# ( [KeyError 오류 수정] 부분 반영)
 if company != '전체':
     display_columns = ['발전기명']
     if '위도' in df_locations.columns and '경도' in df_locations.columns:
@@ -36,11 +36,14 @@ if company != '전체':
     plant_list_df.index += 1
 
     with st.expander(f"✅ {company} 소속 발전소 목록 (총 {len(plant_list_df)}개)"):
-        st.dataframe(plant_list_df, use_container_width=True)
+        # (경고 수정) width='stretch'
+        st.dataframe(plant_list_df, width='stretch')
 
-# (✨ utils 함수 호출)
+# ( utils 함수 호출)
 m_weather, filtered_weather_data = utils.draw_plant_weather_map(df_current_weather, weather_data_available, company)
-map_data = st_folium(m_weather, width=1200, height=500)
+
+# (오류/경고 수정) st_folium, width='stretch'
+map_data = st_folium(m_weather, width='stretch', height=500)
 
 st.header(f"📊 {company} 발전량 그래프")
 
@@ -113,10 +116,18 @@ else:
                     markers=True)
     if x_axis in ['월', '연도']:
         fig.update_xaxes(type='category')
-    st.plotly_chart(fig, use_container_width=True)
+    
+    # (경고 수정) width='stretch'
+    st.plotly_chart(fig, width='stretch')
 
     st.subheader(f"📈 {stat_prefix}별 요약 통계")
+    
+    # -----------------------------------------------------------------
+    # ✨ [NameError 오류 수정] agg_g.ggd -> agg_data
+    # -----------------------------------------------------------------
     total_gen = agg_data['발전량(MWh)'].sum()
+    # -----------------------------------------------------------------
+    
     avg_gen = agg_data['발전량(MWh)'].mean()
     max_gen = agg_data['발전량(MWh)'].max()
     min_gen = agg_data['발전량(MWh)'].min()
@@ -132,4 +143,9 @@ else:
         if x_axis == '날짜':
             display_df['날짜'] = display_df['날짜'].dt.strftime('%Y-%m-%d')
         display_df['발전량(MWh)'] = display_df['발전량(MWh)'].round(2)
-        st.dataframe(display_df.sort_values(by=x_axis, ascending=False), use_container_width=True)
+        
+        # (경고 수정) width='stretch'
+        st.dataframe(
+            display_df.sort_values(by=x_axis, ascending=False),
+            width='stretch'
+        )
