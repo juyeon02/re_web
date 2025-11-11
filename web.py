@@ -1,21 +1,13 @@
-# web.py (수정본 - API 호출 없음)
-
 import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import st_folium
 import plotly.express as px
-import datetime # 날씨 데이터 처리에 필요
-
-# -----------------------------------------------------------------
-# ✨ 1. API 함수, 캐시, 스피너 모두 삭제
-# -----------------------------------------------------------------
-# (API 관련 코드가 모두 사라지고 CSV 로드만 남음)
-# -----------------------------------------------------------------
+import datetime 
 
 # 1. 웹페이지 제목
 st.set_page_config(layout="wide")
-st.title("☀️ 태양광 발전량 대시보드 ☀️")
+st.title("태양광 발전량 대시보드")
 
 # 2. 데이터 파일 불러오기
 try:
