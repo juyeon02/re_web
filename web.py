@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import folium
@@ -319,7 +318,44 @@ elif view_mode == "발전소별 상세 (날씨 지도)":
             title_suffix = f"매년 {selected_month}월"
 
         fig = px.line(daily_gen, x='날짜', y='발전량(MWh)',
-                      title=f"{graph_title_name} {title_suffix} 발전량 합계 추이",
-                      markers=True)
+                        title=f"{graph_title_name} {title_suffix} 발전량 합계 추이",
+                        markers=True)
+        
+        # (수정) use_container_width=True 로 변경하여 반응형 너비 지원
+        st.plotly_chart(fig, use_container_width=True)
 
-        st.plotly_chart(fig, width='stretch')
+        
+        # -----------------------------------------------------------------
+        # ✨ [요청사항] 요약 통계 및 데이터 테이블 추가 (여기부터)
+        # -----------------------------------------------------------------
+        
+        st.subheader("📈 요약 통계")
+
+        # 1. 통계 계산 (daily_gen 사용)
+        total_gen = daily_gen['발전량(MWh)'].sum()
+        avg_gen = daily_gen['발전량(MWh)'].mean()
+        max_gen = daily_gen['발전량(MWh)'].max()
+        min_gen = daily_gen['발전량(MWh)'].min()
+
+        # 2. st.metric을 사용해 4열로 깔끔하게 표시
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("총 발전량 (MWh)", f"{total_gen:,.2f}")
+        col2.metric("일평균 발전량 (MWh)", f"{avg_gen:,.2f}")
+        col3.metric("일최대 발전량 (MWh)", f"{max_gen:,.2f}")
+        col4.metric("일최소 발전량 (MWh)", f"{min_gen:,.2f}")
+
+        # 3. st.expander 안에 상세 데이터 '표' (DataFrame) 표시
+        with st.expander("상세 데이터 표 보기 (날짜별 합계)"):
+            # 사용자가 보기 편하도록 날짜 포맷 변경 및 소수점 정리
+            display_df = daily_gen.copy()
+            display_df['날짜'] = display_df['날짜'].dt.strftime('%Y-%m-%d')
+            display_df['발전량(MWh)'] = display_df['발전량(MWh)'].round(2)
+            
+            # 최신 날짜순으로 정렬하여 표시
+            st.dataframe(
+                display_df.sort_values(by='날짜', ascending=False), 
+                use_container_width=True
+            )
+        # -----------------------------------------------------------------
+        # ✨ [요청사항] 추가된 코드 (여기까지)
+        # -----------------------------------------------------------------
