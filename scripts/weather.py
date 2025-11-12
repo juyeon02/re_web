@@ -12,7 +12,7 @@ load_dotenv(dotenv_path=dotenv_path)
 
 AUTH_KEY = os.getenv("MY_API_KEY")
 INTERVAL = 30
-INPUT_FILE = "locations.csv"
+INPUT_FILE = "locations_원본.csv"
 INPUT_ENCODING = "cp949"
 OUTPUT_FILE = "solar_data_2024_total.csv"
 OUTPUT_ENCODING = "utf-8-sig"
