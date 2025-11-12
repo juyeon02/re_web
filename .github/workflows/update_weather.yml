@@ -3,17 +3,21 @@
 name: Update Weather Data
 
 on:
-  # 1. 6시간마다 자동으로 실행
   schedule:
-    - cron: '0 */6 * * *' # 매 6시간마다 (0시, 6시, 12시, 18시)
-  
-  # 2. GitHub의 'Actions' 탭에서 수동으로 실행할 수 있게 버튼 추가
+    - cron: '0 */6 * * *' 
   workflow_dispatch:
 
 jobs:
   update-data:
     runs-on: ubuntu-latest
     
+    # -----------------------------------------------------------------
+    # ✨ [오류 수정] 로봇에게 '쓰기(push)' 권한 부여
+    # -----------------------------------------------------------------
+    permissions:
+      contents: write
+    # -----------------------------------------------------------------
+      
     steps:
       # 1. GitHub 저장소의 코드를 로봇 서버로 가져오기 (Checkout)
       - name: Checkout repository
@@ -23,7 +27,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11' # 님의 파이썬 버전에 맞게 조절
+          python-version: '3.11' 
 
       # 3. 스크립트 실행에 필요한 라이브러리 설치
       - name: Install dependencies
@@ -32,7 +36,6 @@ jobs:
           pip install -r requirements.txt
 
       # 4. 날씨 데이터 수집 스크립트 실행
-      #    (중요) MY_API_KEY를 환경변수로 주입
       - name: Run weather script
         env:
           MY_API_KEY: ${{ secrets.MY_API_KEY }}
