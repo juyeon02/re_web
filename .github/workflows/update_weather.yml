@@ -40,7 +40,7 @@ jobs:
         env:
           MY_API_KEY: ${{ secrets.MY_API_KEY }}
         run: |
-          python scripts/weather.py
+          python scripts/예측api.py
           
       # 5. 변경된 CSV 파일을 GitHub에 다시 커밋(저장)
       - name: Commit and push if data changed

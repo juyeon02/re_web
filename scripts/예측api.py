@@ -1,50 +1,50 @@
-# 예측api.py (GitHub Actions 로봇이 실행할 파일)
-
+# scripts/weather.py
 import pandas as pd
 import requests
+import io
 import time
-import datetime
 import os
+import datetime
+from zoneinfo import ZoneInfo # (Python 3.9+ 표준)
 from dotenv import load_dotenv
+
+# --- 1. 환경변수 및 경로 설정 ---
+# (GitHub Actions에서는 .env가 없어도 secrets에서 값을 읽어옴)
+# (로컬 테스트를 위해 .env도 읽도록 설정)
 dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 load_dotenv(dotenv_path=dotenv_path)
-
 AUTH_KEY = os.getenv("MY_API_KEY")
-INPUT_FILE = "locations_원본.csv"
-OUTPUT_FILE = "today_forecast_3hourly_final.csv" # 최종 저장 파일
-BASE_URL = "https://apihub.kma.go.kr/api/typ01/cgi-bin/url/nph_sun_nwp_txt"
-CONVERSION_FACTOR = (3 * 3600) / 1000000 
-VARIABLES_TO_FETCH = {
-    "DSWRF": "일사", "TMP": "기온", "RH": "습도"
-}
+
+# GitHub Actions 실행 위치(루트) 기준의 상대 경로
+INPUT_FILE = "data/locations_원본.csv"
+INPUT_ENCODING = "utf-8" # GitHub/Linux 환경은 utf-8
+OUTPUT_FILE = "data/today_forecast_3hourly_final.csv" # (★ 여기에 저장)
+OUTPUT_ENCODING = "utf-8-sig"
+
+# API 설정
+BASE_URL = "https://apihub.kma.go.kr/api/typ01/cgi-bin/url/nph_sun_sat_ana_txt"
+INTERVAL = 30 # (30분 간격? 님의 코드에 있었음)
+
+# --- 2. '오늘' 날짜(KST) 동적 생성 ---
+# KST (한국 시간) 기준 '오늘' 날짜 객체
+today_kst_dt = datetime.datetime.now(ZoneInfo("Asia/Seoul"))
+# API 요청에 사용할 'YYYYMMDD' 형식의 문자열 (예: "20251112")
+TODAY_STR = today_kst_dt.strftime('%Y%m%d')
+
+print(f"--- KST 기준 '오늘' 날짜: {TODAY_STR} ---")
+print(f"--- 이 날짜의 예보를 API에 요청합니다. ---")
+
+# '오늘' 하루의 시간대를 오전/오후로 나눔
 time_periods = [
-    {"name": "Part 1", "start_time": "0000", "end_time": "1500"},
-    {"name": "Part 2", "start_time": "1800", "end_time": "2100"}
+    {"name": "오전", "start": TODAY_STR + "0000", "end": TODAY_STR + "1130"},
+    {"name": "오후", "start": TODAY_STR + "1200", "end": TODAY_STR + "2330"}
 ]
 
-# --- 2. API 모델 시간 설정 ---
-# (이 스크립트는 '내일' 날씨를 예측합니다)
-try:
-    TODAY = datetime.datetime.now()
-    TOMORROW = TODAY + datetime.timedelta(days=1)
-    
-    TOMORROW_STR = TOMORROW.strftime('%Y%m%d')    # 예: "20251111" (예측할 날짜)
-    TODAY_STR = TODAY.strftime('%Y%m%d')          # 예: "20251110"
-    
-    # 가장 최근에 완성된 '오늘 18시 UTC' 모델 사용
-    MODEL_RUN_TIME = TODAY_STR + "1800"
+# -----------------------------
+all_dataframes = [] # (오늘 데이터만 담을 리스트)
 
-except Exception as e:
-    print(f"날짜 생성 중 오류: {e}")
-    # 오류 시 대체 (오늘 18시, 내일 날짜)
-    MODEL_RUN_TIME = datetime.datetime.now().strftime('%Y%m%d') + "1800"
-    TOMORROW_STR = (datetime.datetime.now() + datetime.timedelta(days=1)).strftime('%Y%m%d')
-
-all_parsed_data = []
-
-# --- 3. API 파서 함수 (UTC -> KST 변환 포함) ---
-def parse_nwp_response(text_data, location_name, variable_name_korean):
-    # (이전 web.py에 있던 parse_nwp_response 함수와 동일)
+# --- 3. Wide 포맷 파싱 함수 (님이 공유해주신 코드 재사용) ---
+def parse_wide_format_response(text_data, location_name):
     try:
         lines = text_data.strip().split('\n')
         table_lines = [line.strip() for line in lines if line.strip().startswith('|')]
@@ -56,106 +56,128 @@ def parse_nwp_response(text_data, location_name, variable_name_korean):
         time_headers = headers[4:]
         time_values = values[4:]
         if len(time_headers) != len(time_values): return None
-        
+
         parsed_data = []
-        for dt_str, val_str in zip(time_headers, time_values):
+        for dt_str, si_val in zip(time_headers, time_values):
             try:
-                dt_utc = pd.to_datetime(dt_str, format='%Y%m%d%H').tz_localize('UTC')
-                dt_obj = dt_utc.tz_convert('Asia/Seoul') # KST
-                value = float(val_str.replace('-nan', 'NaN'))
+                dt_obj = pd.to_datetime(dt_str, format='%Y%m%d%H%M')
+                si = float(si_val.replace('-nan', 'NaN'))
             except ValueError:
                 continue
             parsed_data.append({
-                "발전기명": location_name, "DATETIME": dt_obj,
-                "변수명": variable_name_korean, "값": value
+                "발전기명": location_name,
+                "DATETIME": dt_obj,
+                "SI": si
             })
-        return pd.DataFrame(parsed_data) if parsed_data else None
+        if not parsed_data: return None
+        return pd.DataFrame(parsed_data)
     except Exception as e:
-        print(f"   -> [파싱 함수 오류] {location_name} ({variable_name_korean}): {e}")
+        print(f"      -> [파싱 함수 오류] {location_name}: {e}")
         return None
 
 # --- 4. 메인 스크립트 실행 ---
-print(f"--- '내일({TOMORROW_STR})' 예측 데이터 수집 및 변환 시작 ---")
-print(f"'{MODEL_RUN_TIME}' 모델 (오늘 18시 UTC) 기준\n")
-
 try:
-    # 1. (수정!) locations.csv를 'UTF-8'로 읽습니다.
-    df_locations = pd.read_csv(INPUT_FILE)
-    
+    # 1. 위치 파일 읽기 (UTF-8)
+    df_locations = pd.read_csv(INPUT_FILE, encoding=INPUT_ENCODING)
+    print(f"'{INPUT_FILE}' (인코딩: {INPUT_ENCODING}) 파일 로드 성공.")
+    print(f"총 {len(df_locations)}개 위치에 대해 데이터 수집을 시작합니다.")
+
+    # 2. 모든 위치에 대해 '오늘' 날짜만 요청
     for row in df_locations.itertuples():
         lat = row.위도
         lon = row.경도
         location_name = row.발전기명.strip()
-        
-        print(f"--- 📍'{location_name}' (위도:{lat}, 경도:{lon}) 처리 중 ---")
-    
-        for var_code, var_name_korean in VARIABLES_TO_FETCH.items():
-            for period in time_periods:
-                
-                forecast_start_time = TOMORROW_STR + period['start_time']
-                forecast_end_time = TOMORROW_STR + period['end_time']
-                
-                params = {
-                    'authKey': AUTH_KEY, 'nwp': 'KIMG', 'varn': var_code,
-                    'tm': MODEL_RUN_TIME,
-                    'tmef1': forecast_start_time,
-                    'tmef2': forecast_end_time, 'int': 3, 'lat': lat, 'lon': lon
-                }
+        print(f"\n--- 📍'{location_name}' (위도:{lat}, 경도:{lon}) {TODAY_STR} 처리 중 ---")
 
-                try:
-                    response = requests.get(BASE_URL, params=params, timeout=60) 
-
-                    if response.status_code == 200:
-                        data_text = response.text.strip()
-                        if data_text and not data_text.startswith("#ERROR") and not data_text.startswith("<Error>"):
-                            df_temp = parse_nwp_response(data_text, location_name, var_name_korean)
-                            if df_temp is not None and not df_temp.empty:
-                                all_parsed_data.append(df_temp)
+        for period in time_periods:
+            print(f"      -> {period['name']} ({period['start']}~{period['end']}) 요청...")
+            params = {
+                'authKey': AUTH_KEY,
+                'tm1': period['start'],
+                'tm2': period['end'],
+                'int': INTERVAL,
+                'lat': lat,
+                'lon': lon
+            }
+            try:
+                response = requests.get(BASE_URL, params=params, timeout=30)
+                if response.status_code == 200:
+                    data_text = response.text.strip()
+                    if data_text and not data_text.startswith("#ERROR") and not data_text.startswith("<Error>"):
+                        df_temp = parse_wide_format_response(data_text, location_name)
+                        if df_temp is not None and not df_temp.empty:
+                            all_dataframes.append(df_temp)
+                            print(f"      -> {period['name']} 데이터 파싱 성공 (데이터 {len(df_temp)}개)")
                         else:
-                            print(f"   -> [API 오류] {period['name']} ({var_name_korean}) 응답: {data_text}")
+                            # Long 포맷 예외 처리 (님이 공유해주신 코드)
+                            try:
+                                df_long = pd.read_csv(io.StringIO(data_text), delim_whitespace=True, comment='#')
+                                if 'SI' in df_long.columns:
+                                    print(f"      -> [알림] {period['name']} 'Long' 포맷 데이터 파싱 성공 (데이터 {len(df_long)}개)")
+                                    df_long['발전기명'] = location_name
+                                    all_dataframes.append(df_long)
+                                else:
+                                    print(f"      -> [파싱 실패] {period['name']} 응답이 알 수 없는 형식입니다: {data_text[:50]}...")
+                            except Exception:
+                                print(f"      -> [파싱 실패] {period['name']} 응답이 알 수 없는 형식입니다: {data_text[:50]}...")
+                    elif data_text.count('\n') < 2:
+                        print(f"      -> [알림] {period['name']} 데이터가 없습니다 (API가 빈 응답 반환).")
                     else:
-                        print(f"   -> [HTTP 오류] {period['name']} ({var_name_korean}): 상태 코드 {response.status_code}")
+                        print(f"      -> [API 오류] {period['name']} 응답: {data_text}")
+                elif response.status_code == 429:
+                    print(f"      -> [!!! API 트래픽 제한 감지 !!!] (HTTP 429)")
+                    print("      -> 30초간 대기 후 재시도합니다...")
+                    time.sleep(30)
+                else:
+                    print(f"      -> [HTTP 오류] {period['name']}: 상태 코드 {response.status_code}")
+            except requests.exceptions.Timeout:
+                print(f"      -> [네트워크 오류] {period['name']} 요청 시간 초과 (Timeout=30s).")
+            except requests.exceptions.RequestException as e:
+                print(f"      -> [네트워크 오류] {period['name']} 요청 중 예외 발생: {e}")
+            time.sleep(0.2) # (API 매너 타임)
+        print(f"--- ✔️ '{location_name}' ({TODAY_STR}) 처리 완료 ---")
 
-                except requests.exceptions.Timeout:
-                    print(f"   -> [네트워크 오류] {period['name']} ({var_name_korean}) 요청 시간 초과.")
-                except requests.exceptions.RequestException as e:
-                    print(f"   -> [네트워크 오류] {period['name']} ({var_name_korean}) 요청 중 예외: {e}")
-                
-                time.sleep(0.5) # (안정성) 0.5초 대기
-        print(f"--- ✔️ '{location_name}' 처리 완료 ---\n")
+    # --- 5. 데이터 취합 및 최종 파일 생성 ---
+    if all_dataframes:
+        final_df = pd.concat(all_dataframes, ignore_index=True)
 
-    # --- 5. [합본] 최종 변환 및 저장 ---
-    if all_parsed_data:
-        print(f"\n--- ✨ 모든 위치 데이터 취합 및 최종 변환 시작 ---")
-        
-        final_df = pd.concat(all_parsed_data, ignore_index=True)
-        final_pivot_df = final_df.pivot_table(
-            index=['발전기명', 'DATETIME'], columns='변수명', values='값'
-        ).reset_index()
-        final_pivot_df = final_pivot_df.sort_values(by=['발전기명', 'DATETIME'])
-        
-        final_pivot_df['일사'] = final_pivot_df['일사'].fillna(0)
-        final_pivot_df['기온'] = final_pivot_df['기온'].fillna(0)
-        final_pivot_df['습도'] = final_pivot_df['습도'].fillna(0)
-        final_pivot_df['일사량(MJ/m²)'] = final_pivot_df['일사'] * CONVERSION_FACTOR
-        final_pivot_df = final_pivot_df.drop(columns=['일사'])
-        final_pivot_df['DATETIME'] = final_pivot_df['DATETIME'].dt.tz_localize(None)
-        
-        final_pivot_df = final_pivot_df.rename(columns={
-            'DATETIME': '날짜', '기온': '기온(°C)', '습도': '습도(%)'
-        })
-        df_final_output = final_pivot_df[['발전기명', '날짜', '일사량(MJ/m²)', '기온(°C)', '습도(%)']]
+        # 'DATETIME' 컬럼이 없는 경우(Long 포맷)를 대비
+        if 'DATETIME' not in final_df.columns:
+            try:
+                final_df['DATETIME'] = pd.to_datetime(final_df[['YEAR', 'MON', 'DAY', 'HR', 'MIN']])
+            except Exception as e:
+                print(f"날짜 변환 실패: {e}.")
 
-        # 7-10. (수정!) 'UTF-8'로 CSV 파일 저장
-        df_final_output.to_csv(OUTPUT_FILE, index=False, encoding='utf-8-sig')
-        
-        print(f"\n--- ✨ 최종 변환 완료 ✨ ---")
-        print(f"'{OUTPUT_FILE}' 파일로 저장했습니다.")
+        final_columns = ['발전기명', 'DATETIME', 'SI']
+        existing_final_columns = [col for col in final_columns if col in final_df.columns]
+
+        if 'SI' not in final_df.columns or '발전기명' not in final_df.columns:
+            print("최종 데이터에 'SI' 또는 '발전기명' 컬럼이 없습니다.")
+        else:
+            final_output_df = final_df[existing_final_columns]
+            final_output_df = final_output_df.sort_values(by=['발전기명', 'DATETIME'])
+            final_output_df = final_output_df.drop_duplicates(subset=['발전기명', 'DATETIME'], keep='first')
+            
+            # (중요) '오늘' 날짜 데이터만 저장
+            # (혹시 모를 API 응답 오류(어제 데이터가 섞임)를 대비해 2중 체크)
+            today_kst_date_obj = datetime.datetime.now(ZoneInfo("Asia/Seoul")).date()
+            filtered_output_df = final_output_df[
+                final_output_df['DATETIME'].dt.date == today_kst_date_obj
+            ].copy()
+            
+            if not filtered_output_df.empty:
+                # (★ 최종 목적 파일에 저장)
+                filtered_output_df.to_csv(OUTPUT_FILE, index=False, encoding=OUTPUT_ENCODING)
+                print(f"\n--- {today_kst_date_obj} 날짜의 예보 {len(filtered_output_df)}건만 '{OUTPUT_FILE}' 파일로 저장했습니다. ---")
+                print("\n데이터 미리보기")
+                print(filtered_output_df.head())
+            else:
+                 print(f"\n--- {today_kst_date_obj} 날짜의 예보가 API에 아직 없습니다. (파일 업데이트 안함) ---")
     else:
         print("\n--- 작업 완료 ---")
-        print("성공적으로 가져온 데이터가 없습니다.")
+        print("모든 요청에서 유효한 데이터를 수집하지 못했습니다.")
 
 except FileNotFoundError:
-    print(f"오류: 입력 파일 '{INPUT_FILE}'을(를) 찾을 수 없습니다. (UTF-8 변환 필요)")
+    print(f"오류 '{INPUT_FILE}'을 찾을 수 없습니다. (경로: {os.path.abspath(INPUT_FILE)})")
 except Exception as e:
-    print(f"[오류] 스크립트 실행 중 치명적인 오류가 발생했습니다: {e}")
+    print(f"스크립트 실행 중 오류 발생 {e}")
