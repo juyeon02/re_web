@@ -1,4 +1,3 @@
-# utils.py
 import streamlit as st
 import pandas as pd
 import folium
@@ -82,12 +81,15 @@ def load_data():
         st.error(f"필수 파일을 찾을 수 없습니다: {e.filename}. (data/ 폴더에 있는지 확인하세요)")
         st.stop()
 
-    # 날씨 예보 (파일이 없어도 앱이 멈추지 않도록)
+    # ❗️ [수정 1] 날씨 예보 파일명 변경 및 KST 날짜 파싱
     try:
-        df_today_forecast = pd.read_csv("data/today_forecast_3hourly_final.csv")
-        df_today_forecast['발전기명'] = df_today_forecast['발전기명'].str.strip()
+        # 'data/' 경로 제거, '날짜' 컬럼을 파싱하도록 parse_dates 추가
+        df_today_forecast = pd.read_csv(
+            "최종_날씨_예측_데이터.csv", 
+            parse_dates=['날짜'] # KST 타임존이 포함된 datetime 객체로 읽어옴
+        )
     except FileNotFoundError:
-        st.warning("`data/today_forecast_3hourly_final.csv` 파일이 없습니다.")
+        st.warning("`최종_날씨_예측_데이터.csv` 파일이 없습니다. (GitHub Actions가 실행되었는지 확인하세요)")
         df_today_forecast = pd.DataFrame()
 
     # [수정] '연간' 데이터와 '월간' 데이터를 모두 반환
@@ -103,12 +105,22 @@ def process_weather_data(df_today_forecast, df_locations):
 
     if not df_today_forecast.empty:
         try:
-            now_kst = pd.to_datetime(datetime.datetime.now(
-                datetime.timezone(datetime.timedelta(hours=9)))).tz_localize(None)
-            df_today_forecast['날짜'] = pd.to_datetime(df_today_forecast['날짜'])
+            # ❗️ [수정 2] 현재 시간을 타임존(KST)을 포함하여 가져옴
+            now_kst = pd.Timestamp.now(tz='Asia/Seoul')
+            
+            # '날짜' 컬럼은 load_data에서 이미 타임존이 적용된 datetime 객체임
+            
+            # 타임존이 일치하므로 time_diff 계산이 올바르게 작동함
             df_today_forecast['time_diff'] = abs(df_today_forecast['날짜'] - now_kst)
+            
+            # 현재 시간과 가장 가까운 예보 데이터를 발전소별로 선택
             df_current_weather = df_today_forecast.loc[df_today_forecast.groupby('발전기명')['time_diff'].idxmin()]
-            df_current_weather = pd.merge(df_current_weather, df_locations, on='발전기명')
+            
+            # ❗️ [수정] '발전사' 정보만 df_locations에서 가져옴 (좌표 중복 방지)
+            # '최종_날씨_예측_데이터.csv'에 이미 '위도', '경도'가 있으므로 '발전사' 컬럼만 필요함
+            location_info = df_locations[['발전기명', '발전사']]
+            df_current_weather = pd.merge(df_current_weather, location_info, on='발전기명', how='left')
+            
             weather_data_available = True
         except Exception as e:
             st.error(f"날씨 예보 CSV 처리 중 오류: {e}")
@@ -121,8 +133,9 @@ def process_weather_data(df_today_forecast, df_locations):
 
 # (공통) 날씨 아이콘 그리는 함수
 def create_weather_icon(row):
-    temp = row.get('기온(°C)', 0)
-    insolation = row.get('일사량(MJ/m²)', 0)
+    # ❗️ [수정 3] 새 CSV의 한글 컬럼명('기온', '일사량')으로 변경
+    temp = row.get('기온', 0)
+    insolation = row.get('일사량', 0) # Open-Meteo의 'shortwave_radiation' (W/m²)
 
     html = f"""
     <div style="font-family: 'Arial', sans-serif;
@@ -138,7 +151,7 @@ def create_weather_icon(row):
                 overflow: hidden;
                 text-overflow: ellipsis;">
         <strong style="font-size: 13px; color: #333;">{row['발전기명']}</strong><br>
-        <span style="color: #E67E22;">☀️ {insolation:.2f} MJ</span><br>
+        <span style="color: #E67E22;">☀️ {insolation:.1f} W/m²</span><br>
         <span style="color: #C0392B;">🌡️ {temp:.1f} °C</span>
     </div>
     """
