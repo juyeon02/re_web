@@ -3,7 +3,7 @@ import pandas as pd
 import requests_cache
 from retry_requests import retry
 import os # 파일 확인을 위해 import
-import pickle # ❗️ Pickle(.pkl) 임포트
+import pickle # Pickle(.pkl) 임포트
 
 # --- 1. 로케이션 파일 먼저 불러오기 ---
 location_file = "data/locations_원본.csv"
@@ -44,7 +44,7 @@ openmeteo = openmeteo_requests.Client(session = retry_session)
 
 url = "https://api.open-meteo.com/v1/forecast"
 
-# ❗️ 'daily'(일별) 8개 기상 변수 요청
+# ❗️ [수정] 'sunshine_duration_sum' -> 'sunshine_duration'
 params = {
     "latitude": location_df['위도'].tolist(),
     "longitude": location_df['경도'].tolist(),
@@ -54,7 +54,7 @@ params = {
         "precipitation_sum",         # 총강수량
         "snowfall_sum",              # 총적설량
         "wind_speed_10m_mean",       # 평균풍속
-        "sunshine_duration_sum",     # 일조시간
+        "sunshine_duration",         # ❗️ [수정] 일조시간 (sum 제거)
         "shortwave_radiation_sum",   # 일사량
         "cloud_cover_mean"           # 평균운량
     ]
@@ -69,14 +69,14 @@ print("날씨 API (Forecast-Daily) 데이터 처리 중...")
 # --- 3. 데이터 처리 (enumerate 사용) ---
 for i, response in enumerate(responses):
     
-    # ❗️ 'daily'(일별) 데이터 처리
+    # 'daily'(일별) 데이터 처리
     daily = response.Daily()
     daily_temperature_2m_mean = daily.Variables(0).ValuesAsNumpy()
     daily_relative_humidity_2m_mean = daily.Variables(1).ValuesAsNumpy()
     daily_precipitation_sum = daily.Variables(2).ValuesAsNumpy()
     daily_snowfall_sum = daily.Variables(3).ValuesAsNumpy()
     daily_wind_speed_10m_mean = daily.Variables(4).ValuesAsNumpy()
-    daily_sunshine_duration_sum = daily.Variables(5).ValuesAsNumpy()
+    daily_sunshine_duration = daily.Variables(5).ValuesAsNumpy() # ❗️ [수정] sum이 빠진 변수
     daily_shortwave_radiation_sum = daily.Variables(6).ValuesAsNumpy()
     daily_cloud_cover_mean = daily.Variables(7).ValuesAsNumpy()
     
@@ -88,13 +88,13 @@ for i, response in enumerate(responses):
     )
     daily_data = {"날짜": date_range_utc.date}
     
-    # ❗️ [기상 변수 8개] (MODEL_FEATURES 순서와 맞춤)
+    # [기상 변수 8개] (MODEL_FEATURES 순서와 맞춤)
     daily_data["평균기온"] = daily_temperature_2m_mean
     daily_data["평균습도"] = daily_relative_humidity_2m_mean
     daily_data["총강수량"] = daily_precipitation_sum
     daily_data["총적설량"] = daily_snowfall_sum
     daily_data["평균풍속"] = daily_wind_speed_10m_mean / 3.6 # km/h -> m/s
-    daily_data["일조시간"] = daily_sunshine_duration_sum / 3600.0 # s -> h
+    daily_data["일조시간"] = daily_sunshine_duration / 3600.0 # s -> h (단위 변환은 동일)
     daily_data["일사량"] = daily_shortwave_radiation_sum * 0.0036 # W/m² -> MJ/m²
     daily_data["평균운량"] = daily_cloud_cover_mean
     
@@ -105,16 +105,15 @@ for i, response in enumerate(responses):
     daily_dataframe['위도'] = location_df.iloc[i]['위도']
     daily_dataframe['경도'] = location_df.iloc[i]['경도']
     
-    # ❗️ [필수 재료 1개] '설비용량(MW)'을 location_df에서 찾아서 추가
+    # [필수 재료 1개] '설비용량(MW)'을 location_df에서 찾아서 추가
     capacity = location_df.iloc[i]['설비용량(MW)']
     daily_dataframe['설비용량(MW)'] = capacity 
     
     # ⬇️ --- Pickle(.pkl)로 모델 로드 및 발전량 예측 --- ⬇️
-    model_path = f"models/{plant_name}_model.pkl" # ❗️ .pkl로 경로 수정
+    model_path = f"models/{plant_name}_model.pkl" # .pkl로 경로 수정
 
     if os.path.exists(model_path):
         try:
-            # ❗️ pickle.load() 방식으로 수정
             with open(model_path, 'rb') as f:
                 loaded_model = pickle.load(f)
             
