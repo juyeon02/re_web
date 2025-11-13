@@ -1,0 +1,32 @@
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:               발전량(MWh)   R-squared:                       0.681
+Model:                            OLS   Adj. R-squared:                  0.679
+Method:                 Least Squares   F-statistic:                     296.3
+Date:                Wed, 12 Nov 2025   Prob (F-statistic):          1.87e-169
+Time:                        13:52:17   Log-Likelihood:                -1455.1
+No. Observations:                 700   AIC:                             2922.
+Df Residuals:                     694   BIC:                             2949.
+Df Model:                           5                                         
+Covariance Type:            nonrobust                                         
+==============================================================================
+                 coef    std err          t      P>|t|      [0.025      0.975]
+------------------------------------------------------------------------------
+const          6.2595      0.073     85.251      0.000       6.115       6.404
+설비용량(MW)   -2.652e-16   1.57e-17    -16.891      0.000   -2.96e-16   -2.34e-16
+평균기온          -0.8303      0.089     -9.327      0.000      -1.005      -0.655
+총적설량          -0.4230      0.077     -5.519      0.000      -0.573      -0.273
+일조시간           1.0290      0.188      5.480      0.000       0.660       1.398
+일사량            1.6761      0.179      9.362      0.000       1.325       2.028
+평균운량          -0.5013      0.101     -4.988      0.000      -0.699      -0.304
+==============================================================================
+Omnibus:                       39.212   Durbin-Watson:                   1.517
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):               51.403
+Skew:                          -0.497   Prob(JB):                     6.89e-12
+Kurtosis:                       3.880   Cond. No.                     1.27e+16
+==============================================================================
+
+Notes:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+[2] The smallest eigenvalue is 1.08e-29. This might indicate that there are
+strong multicollinearity problems or that the design matrix is singular.

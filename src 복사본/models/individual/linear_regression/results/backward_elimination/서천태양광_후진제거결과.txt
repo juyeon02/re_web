@@ -1,0 +1,34 @@
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:               발전량(MWh)   R-squared:                       0.865
+Model:                            OLS   Adj. R-squared:                  0.864
+Method:                 Least Squares   F-statistic:                     631.2
+Date:                Wed, 12 Nov 2025   Prob (F-statistic):          5.24e-295
+Time:                        13:52:17   Log-Likelihood:                -1549.5
+No. Observations:                 698   AIC:                             3115.
+Df Residuals:                     690   BIC:                             3151.
+Df Model:                           7                                         
+Covariance Type:            nonrobust                                         
+==============================================================================
+                 coef    std err          t      P>|t|      [0.025      0.975]
+------------------------------------------------------------------------------
+const         11.8562      0.085    139.806      0.000      11.690      12.023
+설비용량(MW)    9.668e-16   5.66e-17     17.087      0.000    8.56e-16    1.08e-15
+평균기온          -0.8821      0.126     -7.016      0.000      -1.129      -0.635
+평균습도          -0.6542      0.109     -5.979      0.000      -0.869      -0.439
+총강수량           0.3273      0.112      2.919      0.004       0.107       0.547
+총적설량          -0.3603      0.090     -3.985      0.000      -0.538      -0.183
+평균풍속          -0.5900      0.101     -5.845      0.000      -0.788      -0.392
+일사량            5.5911      0.123     45.283      0.000       5.349       5.834
+평균운량          -0.3245      0.100     -3.260      0.001      -0.520      -0.129
+==============================================================================
+Omnibus:                       81.946   Durbin-Watson:                   1.572
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):              138.431
+Skew:                          -0.759   Prob(JB):                     8.71e-31
+Kurtosis:                       4.567   Cond. No.                     5.22e+15
+==============================================================================
+
+Notes:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+[2] The smallest eigenvalue is 5.45e-29. This might indicate that there are
+strong multicollinearity problems or that the design matrix is singular.
