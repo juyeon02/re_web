@@ -1,7 +1,7 @@
 # web.py (메인 페이지 - 종합 현황)
 import streamlit as st
 from streamlit_folium import st_folium # ✨ [오류 수정] st_folium을 임포트
-import utils  
+import web_utils  
 import pandas as pd # 👈 [추가] 날짜 처리를 위해 pandas 임포트
 
 # -----------------------------------------------------------------
@@ -11,10 +11,10 @@ st.set_page_config(layout="wide")
 st.title("☀️ 태양광 발전량 대시보드 ☀️")
 
 # ( '월간' 데이터프래임도 받도록 변수 추가)
-df_locations, df_generation, df_region_solar, korea_geojson, df_today_forecast, df_region_solar_monthly = utils.load_data()
+df_locations, df_generation, df_region_solar, korea_geojson, df_today_forecast, df_region_solar_monthly = web_utils.load_data()
 
 # ( utils.py에서 날씨 데이터 처리) - '현재' 날씨 지도용
-df_current_weather, weather_data_available = utils.process_weather_data(df_today_forecast, df_locations)
+df_current_weather, weather_data_available = web_utils.process_weather_data(df_today_forecast, df_locations)
 
 # -----------------------------------------------------------------
 # 6. 메인 화면 (종합 현황)
@@ -30,7 +30,7 @@ with col1:
     data_2023 = df_region_solar[df_region_solar['연도'] == 2023]
     
     # (지도json, 지도데이터, 범례제목) 전달
-    m_choro = utils.draw_choropleth_map(korea_geojson, data_2023, "2023년 연간 태양광 발전량")
+    m_choro = web_utils.draw_choropleth_map(korea_geojson, data_2023, "2023년 연간 태양광 발전량")
     
     # (경고 수정) use_container_width=True
     st_folium(m_choro, use_container_width=True, height=500)
@@ -38,7 +38,7 @@ with col1:
 with col2:
     st.subheader("발전소별 현재 날씨 예보 (전체)")
     # ( utils 함수 호출)
-    m_weather, _ = utils.draw_plant_weather_map(df_current_weather, weather_data_available, '전체')
+    m_weather, _ = web_utils.draw_plant_weather_map(df_current_weather, weather_data_available, '전체')
     
     # (경고 수정) use_container_width=True
     st_folium(m_weather, use_container_width=True, height=500)

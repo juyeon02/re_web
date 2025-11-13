@@ -25,7 +25,7 @@ cache_session = requests_cache.CachedSession('.cache', expire_after = 3600) # 1�
 retry_session = retry(cache_session, retries = 5, backoff_factor = 0.2)
 openmeteo = openmeteo_requests.Client(session = retry_session)
 
-url = "https://api.open-meteo.com/v1/forecast"
+url = "https://api.open-Meteo.com/v1/forecast"
 
 params = {
     "latitude": location_df['위도'].tolist(),
@@ -54,32 +54,37 @@ for i, response in enumerate(responses):
     hourly_wind_speed_10m = hourly.Variables(7).ValuesAsNumpy()
     hourly_cloud_cover = hourly.Variables(8).ValuesAsNumpy()
     
-    # ⬇️ --- [수정된 부분: KST 변환] --- ⬇️
-    
-    # 1. UTC 기준으로 날짜/시간 범위를 생성합니다.
+    # KST 변환
     date_range_utc = pd.date_range(
         start = pd.to_datetime(hourly.Time(), unit = "s", utc = True),
         end = pd.to_datetime(hourly.TimeEnd(), unit = "s", utc = True),
         freq = pd.Timedelta(seconds = hourly.Interval()),
         inclusive = "left"
     )
-    
-    # 2. UTC 시간을 한국 시간(KST, 'Asia/Seoul')으로 변환합니다.
     date_range_kst = date_range_utc.tz_convert('Asia/Seoul')
-
-    # 3. KST로 변환된 시간을 딕셔너리에 넣습니다.
     hourly_data = {"date": date_range_kst}
     
-    # ⬆️ --- [수정 완료] --- ⬆️
     
     hourly_data["temperature_2m"] = hourly_temperature_2m
     hourly_data["weather_code"] = hourly_weather_code
     hourly_data["relative_humidity_2m"] = hourly_relative_humidity_2m
     hourly_data["precipitation"] = hourly_precipitation
     hourly_data["snowfall"] = hourly_snowfall
-    hourly_data["sunshine_duration"] = hourly_sunshine_duration
-    hourly_data["shortwave_radiation"] = hourly_shortwave_radiation
-    hourly_data["wind_speed_10m"] = hourly_wind_speed_10m
+    
+    # ⬇️ --- [수정] 단위 변환 적용 --- ⬇️
+    
+    # 일조시간: s -> h (시간)
+    hourly_data["sunshine_duration"] = hourly_sunshine_duration / 3600.0
+    
+    # 일사량: W/m² -> MJ/m² (1시간 누적 에너지)
+    # (W/m² = J/s/m²) -> (J/s/m²) * 3600s/h = (J/m²/h) -> (J/m²/h) / 1,000,000 = (MJ/m²/h)
+    hourly_data["shortwave_radiation"] = hourly_shortwave_radiation * 0.0036
+    
+    # 풍속: km/h -> m/s
+    hourly_data["wind_speed_10m"] = hourly_wind_speed_10m / 3.6
+    
+    # ⬆️ --- [수정 완료] --- ⬆️
+    
     hourly_data["cloud_cover"] = hourly_cloud_cover
     
     hourly_dataframe = pd.DataFrame(data = hourly_data)
@@ -103,9 +108,9 @@ translation_map = {
     'relative_humidity_2m': '상대습도', 
     'precipitation': '강수량', 
     'snowfall': '적설량', 
-    'sunshine_duration': '일조시간',
-    'shortwave_radiation': '일사량',
-    'wind_speed_10m': '풍속', 
+    'sunshine_duration': '일조시간', # 단위: h
+    'shortwave_radiation': '일사량', # 단위: MJ/m²
+    'wind_speed_10m': '풍속', # 단위: m/s
     'cloud_cover': '운량(%)', 
     '위도 (요청)': '위도',
     '경도 (요청)': '경도'

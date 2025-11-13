@@ -1,6 +1,6 @@
 # pages/발전소별.py
 import streamlit as st
-import utils  
+import web_utils  
 import pandas as pd
 import plotly.express as px
 from streamlit_folium import st_folium # (임포트 확인)
@@ -9,10 +9,10 @@ st.set_page_config(layout="wide")
 st.title("🏭 발전소별 상세 (날씨 지도 및 그래프)")
 
 # ( '월간' 데이터프레임도 받도록 변수 추가)
-df_locations, df_generation, df_region_solar, korea_geojson, df_today_forecast, df_region_solar_monthly = utils.load_data()
+df_locations, df_generation, df_region_solar, korea_geojson, df_today_forecast, df_region_solar_monthly = web_utils.load_data()
 
 # ( utils.py에서 날씨 데이터 처리)
-df_current_weather, weather_data_available = utils.process_weather_data(df_today_forecast, df_locations)
+df_current_weather, weather_data_available = web_utils.process_weather_data(df_today_forecast, df_locations)
 
 # -----------------------------------------------------------------
 # 6. 메인 화면 (발전소별 상세)
@@ -40,7 +40,7 @@ if company != '전체':
         st.dataframe(plant_list_df, width='stretch')
 
 # ( utils 함수 호출)
-m_weather, filtered_weather_data = utils.draw_plant_weather_map(df_current_weather, weather_data_available, company)
+m_weather, filtered_weather_data = web_utils.draw_plant_weather_map(df_current_weather, weather_data_available, company)
 
 # (오류/경고 수정) st_folium, width='stretch'
 map_data = st_folium(m_weather, width='stretch', height=500)

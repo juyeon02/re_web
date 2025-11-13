@@ -131,11 +131,11 @@ def process_weather_data(df_today_forecast, df_locations):
 # 4. 헬퍼 함수 (지도 그리기용)
 # -----------------------------------------------------------------
 
-# (공통) 날씨 아이콘 그리는 함수
+# ⬇️ --- [수정] 단위 변경 (MJ/m²) --- ⬇️
 def create_weather_icon(row):
-    # ❗️ [수정 3] 새 CSV의 한글 컬럼명('기온', '일사량')으로 변경
+    # 새 CSV의 한글 컬럼명('기온', '일사량')으로 변경
     temp = row.get('기온', 0)
-    insolation = row.get('일사량', 0) # Open-Meteo의 'shortwave_radiation' (W/m²)
+    insolation = row.get('일사량', 0) # 단위: MJ/m²
 
     html = f"""
     <div style="font-family: 'Arial', sans-serif;
@@ -151,13 +151,14 @@ def create_weather_icon(row):
                 overflow: hidden;
                 text-overflow: ellipsis;">
         <strong style="font-size: 13px; color: #333;">{row['발전기명']}</strong><br>
-        <span style="color: #E67E22;">☀️ {insolation:.1f} W/m²</span><br>
+        <span style="color: #E67E22;">☀️ {insolation:.2f} MJ/m²</span><br>
         <span style="color: #C0392B;">🌡️ {temp:.1f} °C</span>
     </div>
     """
     return folium.features.DivIcon(
         icon_size=(100, 50), icon_anchor=(50, 25), html=html
     )
+# ⬆️ --- [수정 완료] --- ⬆️
 
 # (신규) 색칠 지도(Choropleth) 그리는 함수
 def draw_choropleth_map(korea_geojson, map_data, legend_title):

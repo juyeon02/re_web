@@ -1,6 +1,6 @@
 # pages/지역별.py
 import streamlit as st
-import utils  # (우리 헬퍼 함수 임포트)
+import web_utils  # (우리 헬퍼 함수 임포트)
 from streamlit_folium import st_folium # ✨ [오류 수정] st_folium을 임포트
 import plotly.express as px 
 
@@ -8,7 +8,7 @@ st.set_page_config(layout="wide")
 st.title("🌍 지역별 상세 (색상 지도)")
 
 # ( '월간' 데이터프레임도 받도록 변수 추가)
-df_locations, df_generation, df_region_solar, korea_geojson, df_today_forecast, df_region_solar_monthly = utils.load_data()
+df_locations, df_generation, df_region_solar, korea_geojson, df_today_forecast, df_region_solar_monthly = web_utils.load_data()
 
 # -----------------------------------------------------------------
 # 6. 메인 화면 (지역별 상세)
@@ -47,7 +47,7 @@ else:
     st.subheader(legend_title)
 
 # ( 동적으로 준비된 데이터와 제목으로 지도 그리기)
-m_choro = utils.draw_choropleth_map(korea_geojson, data_to_map, legend_title)
+m_choro = web_utils.draw_choropleth_map(korea_geojson, data_to_map, legend_title)
 
 # ✨ [오류/경고 수정] st.folium -> st_folium, width='stretch'
 st_folium(m_choro, width='stretch', height=600)
