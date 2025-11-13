@@ -1,22 +1,19 @@
 # pages/발전소별.py
 import streamlit as st
-import web_utils  
+import web_utils
 import pandas as pd
 import plotly.express as px
-from streamlit_folium import st_folium # (임포트 확인)
+from streamlit_folium import st_folium
 
 st.set_page_config(layout="wide")
 st.title("🏭 발전소별 상세 (날씨 지도 및 그래프)")
 
-# ( '월간' 데이터프레임도 받도록 변수 추가)
-df_locations, df_generation, df_region_solar, korea_geojson, df_today_forecast, df_region_solar_monthly = web_utils.load_data()
+# ❗️ [수정] df_past_forecast 추가 (7번째 반환값)
+df_locations, df_generation, df_region_solar, korea_geojson, df_today_forecast, df_region_solar_monthly, df_past_forecast = web_utils.load_data()
 
-# ( utils.py에서 날씨 데이터 처리)
+# ❗️ [수정] df_today_forecast (미래 예보) 전달
 df_current_weather, weather_data_available = web_utils.process_weather_data(df_today_forecast, df_locations)
 
-# -----------------------------------------------------------------
-# 6. 메인 화면 (발전소별 상세)
-# -----------------------------------------------------------------
 st.header("발전소별 상세 (날씨 지도 및 그래프)")
 
 company_list = ['전체'] + list(df_locations['발전사'].unique())
@@ -25,7 +22,6 @@ company = st.sidebar.selectbox(
     company_list
 )
 
-# ( [KeyError 오류 수정] 부분 반영)
 if company != '전체':
     display_columns = ['발전기명']
     if '위도' in df_locations.columns and '경도' in df_locations.columns:
@@ -36,116 +32,177 @@ if company != '전체':
     plant_list_df.index += 1
 
     with st.expander(f"✅ {company} 소속 발전소 목록 (총 {len(plant_list_df)}개)"):
-        # (경고 수정) width='stretch'
         st.dataframe(plant_list_df, width='stretch')
 
-# ( utils 함수 호출)
+# (지도 부분은 '미래 예보' 기반이므로 기존과 동일)
 m_weather, filtered_weather_data = web_utils.draw_plant_weather_map(df_current_weather, weather_data_available, company)
-
-# (오류/경고 수정) st_folium, width='stretch'
 map_data = st_folium(m_weather, width='stretch', height=500)
+st.subheader("📍 오늘 발전량 예측 상세 (지도 데이터)")
+if weather_data_available and (filtered_weather_data is not None) and (not filtered_weather_data.empty):
+    display_columns = ['날짜', '발전기명', '발전량_예측(MWh)', '일사량', '평균운량', '평균기온', '총강수량', '일조시간', '평균풍속', '총적설량']
+    rename_map = {'일사량': '일사량(MJ/m²)', '평균운량': '평균운량(%)', '평균기온': '평균기온(°C)', '총강수량': '총강수량(mm)', '일조시간': '일조시간(h)', '평균풍속': '평균풍속(m/s)', '총적설량': '총적설량(cm)'}
+    available_cols = [col for col in display_columns if col in filtered_weather_data.columns]
+    df_display_weather = filtered_weather_data[available_cols].copy()
+    df_display_weather['날짜'] = df_display_weather['날짜'].dt.strftime('%Y-%m-%d')
+    df_display_weather.rename(columns=rename_map, inplace=True)
+    st.dataframe(df_display_weather.set_index('날짜'), width='stretch')
+elif weather_data_available and (filtered_weather_data is None or filtered_weather_data.empty):
+    st.info(f"'{company}' 발전사에는 오늘 예측 데이터가 없습니다.")
+else:
+    st.warning("일별 발전량 예보 데이터를 불러오지 못했습니다.")
 
-st.header(f"📊 {company} 발전량 그래프")
+st.divider()
 
+# --- ⬇️ [수정] "예측 vs 실제" 발전량 비교 그래프 (과거 데이터) --- ⬇️
+st.header(f"📊 {company} 발전량 비교 (예측 vs 실제)")
+
+# 1. '실제' 발전량 데이터 준비 (df_generation)
 if company == '전체':
-    merged_data = pd.merge(df_generation, df_locations, on='발전기명')
+    actual_data_base = pd.merge(df_generation, df_locations, on='발전기명')
 else:
     plant_names = df_locations[df_locations['발전사'] == company]['발전기명'].tolist()
-    merged_data = df_generation[df_generation['발전기명'].isin(plant_names)]
+    actual_data_base = df_generation[df_generation['발전기명'].isin(plant_names)]
 
+# 2. ❗️ [수정] "과거 예측" 발전량 데이터 준비 (df_past_forecast)
+if company == '전체':
+    past_forecast_data_base = df_past_forecast.copy() # ❗️ df_today_forecast -> df_past_forecast
+else:
+    plant_names = df_locations[df_locations['발전사'] == company]['발전기명'].tolist()
+    past_forecast_data_base = df_past_forecast[df_past_forecast['발전기명'].isin(plant_names)] # ❗️ df_today_forecast -> df_past_forecast
+
+# 3. 지도 클릭 이벤트 처리
 clicked_plant_name = map_data.get('last_object_clicked_tooltip')
 graph_title_name = company
 
 if clicked_plant_name:
-    merged_data = merged_data[merged_data['발전기명'] == clicked_plant_name]
+    actual_data_base = actual_data_base[actual_data_base['발전기명'] == clicked_plant_name]
+    past_forecast_data_base = past_forecast_data_base[past_forecast_data_base['발전기명'] == clicked_plant_name]
     graph_title_name = clicked_plant_name
     st.subheader(f"➡️ {clicked_plant_name}")
 else:
     st.subheader("전체 발전소 합계")
 
+# 4. 사이드바 기간 필터
 st.sidebar.title("기간 필터")
+actual_data_base['연도'] = actual_data_base['날짜'].dt.year
+actual_data_base['월'] = actual_data_base['날짜'].dt.month
 
-# (이후 로직은 원본과 동일)
-df_generation['날짜'] = pd.to_datetime(df_generation['날짜'])
-df_generation['연도'] = df_generation['날짜'].dt.year
-df_generation['월'] = df_generation['날짜'].dt.month
-
-if '연도' not in merged_data.columns:
-    merged_data['날짜'] = pd.to_datetime(merged_data['날짜'])
-    merged_data['연도'] = merged_data['날짜'].dt.year
-    merged_data['월'] = merged_data['날짜'].dt.month
-
-year_list_gen = ['전체'] + sorted(list(merged_data['연도'].unique()))
+year_list_gen = ['전체'] + sorted(list(actual_data_base['연도'].unique()))
 selected_year_gen = st.sidebar.selectbox('연도를 선택하세요:', year_list_gen)
 
 if selected_year_gen == '전체':
-    month_list = ['전체'] + sorted(list(merged_data['월'].unique()))
+    month_list = ['전체'] + sorted(list(actual_data_base['월'].unique()))
+    filtered_actual = actual_data_base
 else:
-    merged_data = merged_data[merged_data['연도'] == selected_year_gen]
-    month_list = ['전체'] + sorted(list(merged_data['월'].unique()))
+    filtered_actual = actual_data_base[actual_data_base['연도'] == selected_year_gen]
+    month_list = ['전체'] + sorted(list(filtered_actual['월'].unique()))
 
 selected_month = st.sidebar.selectbox('월을 선택하세요:', month_list)
 
 if selected_month != '전체':
-    merged_data = merged_data[merged_data['월'] == selected_month]
+    filtered_actual = filtered_actual[filtered_actual['월'] == selected_month]
 
-if merged_data.empty:
-    st.warning("선택한 조건의 발전량 데이터가 없습니다.")
+# 5. ❗️ [수정] "과거 예측" 데이터도 동일한 기간으로 필터링
+if not past_forecast_data_base.empty:
+    past_forecast_data_base['연도'] = past_forecast_data_base['날짜'].dt.year
+    past_forecast_data_base['월'] = past_forecast_data_base['날짜'].dt.month
+    
+    if selected_year_gen != '전체':
+        past_forecast_data_base = past_forecast_data_base[past_forecast_data_base['연도'] == selected_year_gen]
+    if selected_month != '전체':
+        past_forecast_data_base = past_forecast_data_base[past_forecast_data_base['월'] == selected_month]
 else:
+    st.info("해당 기간의 '과거 예측' 데이터가 없습니다.")
+
+
+if filtered_actual.empty:
+    st.warning("선택한 조건의 '실제' 발전량 데이터가 없습니다.")
+else:
+    # 6. '실제' 데이터 집계
     if selected_year_gen != '전체' and selected_month != '전체':
-        agg_data = merged_data.groupby('날짜')['발전량(MWh)'].sum().reset_index()
+        agg_actual = filtered_actual.groupby('날짜')['발전량(MWh)'].sum().reset_index()
         x_axis = '날짜'
         title_suffix = f"{selected_year_gen}년 {selected_month}월 (일별)"
-        stat_prefix = "일"
     elif selected_year_gen != '전체' and selected_month == '전체':
-        agg_data = merged_data.groupby('월')['발전량(MWh)'].sum().reset_index()
+        agg_actual = filtered_actual.groupby('월')['발전량(MWh)'].sum().reset_index()
         x_axis = '월'
         title_suffix = f"{selected_year_gen}년 (월별)"
-        stat_prefix = "월"
     else:
-        agg_data = merged_data.groupby('연도')['발전량(MWh)'].sum().reset_index()
+        agg_actual = filtered_actual.groupby('연도')['발전량(MWh)'].sum().reset_index()
         x_axis = '연도'
-        stat_prefix = "연"
-        if selected_month != '전체':
-            title_suffix = f"매년 {selected_month}월 (연도별)"
-        else:
-            title_suffix = "전체 기간 (연도별)"
+        title_suffix = "전체 기간 (연도별)"
+    
+    agg_actual = agg_actual.rename(columns={'발전량(MWh)': '실제 발전량'})
 
-    fig = px.line(agg_data, x=x_axis, y='발전량(MWh)',
-                    title=f"{graph_title_name} {title_suffix} 발전량 합계 추이",
-                    markers=True)
+    # 7. ❗️ [수정] "과거 예측" 데이터 집계
+    if not past_forecast_data_base.empty:
+        if x_axis == '날짜':
+            agg_forecast = past_forecast_data_base.groupby('날짜')['발전량_예측(MWh)'].sum().reset_index()
+        elif x_axis == '월':
+            agg_forecast = past_forecast_data_base.groupby('월')['발전량_예측(MWh)'].sum().reset_index()
+        else: # x_axis == '연도'
+            agg_forecast = past_forecast_data_base.groupby('연도')['발전량_예측(MWh)'].sum().reset_index()
+            
+        agg_forecast = agg_forecast.rename(columns={'발전량_예측(MWh)': '예측 발전량'})
+
+        # 8. '실제'와 '예측' 데이터 병합
+        merged_df = pd.merge(agg_actual, agg_forecast, on=x_axis, how='outer')
+        
+    else: # 예측 데이터가 없는 경우 (과거)
+        merged_df = agg_actual
+        
+    # 9. 2개 선을 그리기 위해 데이터 프레임 재구성 (Melt)
+    if '예측 발전량' in merged_df.columns:
+        df_melted = merged_df.melt(id_vars=[x_axis], 
+                                   value_vars=['실제 발전량', '예측 발전량'], 
+                                   var_name='데이터 종류', 
+                                   value_name='발전량(MWh)')
+    else:
+        df_melted = merged_df.melt(id_vars=[x_axis], 
+                                   value_vars=['실제 발전량'], 
+                                   var_name='데이터 종류', 
+                                   value_name='발전량(MWh)')
+
+    # 10. 2개 선 그래프 그리기
+    fig = px.line(
+        df_melted, 
+        x=x_axis, 
+        y='발전량(MWh)',
+        color='데이터 종류', # 👈 2개 선(실제, 예측)을 구분
+        title=f"{graph_title_name} {title_suffix} 발전량 비교",
+        markers=True,
+        color_discrete_map={'실제 발전량': 'blue', '예측 발전량': 'red'} # 색상 지정
+    )
     if x_axis in ['월', '연도']:
         fig.update_xaxes(type='category')
     
-    # (경고 수정) width='stretch'
     st.plotly_chart(fig, width='stretch')
 
-    st.subheader(f"📈 {stat_prefix}별 요약 통계")
+    # 11. 요약 통계 ('agg_actual' 사용)
+    st.subheader("📈 '실제' 발전량 요약 통계")
     
-    # -----------------------------------------------------------------
-    # ✨ [NameError 오류 수정] agg_g.ggd -> agg_data
-    # -----------------------------------------------------------------
-    total_gen = agg_data['발전량(MWh)'].sum()
-    # -----------------------------------------------------------------
-    
-    avg_gen = agg_data['발전량(MWh)'].mean()
-    max_gen = agg_data['발전량(MWh)'].max()
-    min_gen = agg_data['발전량(MWh)'].min()
+    total_gen = agg_actual['실제 발전량'].sum()
+    avg_gen = agg_actual['실제 발전량'].mean()
+    max_gen = agg_actual['실제 발전량'].max()
+    min_gen = agg_actual['실제 발전량'].min()
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("총 발전량 (MWh)", f"{total_gen:,.2f}")
-    col2.metric(f"{stat_prefix}평균 발전량 (MWh)", f"{avg_gen:,.2f}")
-    col3.metric(f"{stat_prefix}최대 발전량 (MWh)", f"{max_gen:,.2f}")
-    col4.metric(f"{stat_prefix}최소 발전량 (MWh)", f"{min_gen:,.2f}")
+    col2.metric("평균 발전량 (MWh)", f"{avg_gen:,.2f}")
+    col3.metric("최대 발전량 (MWh)", f"{max_gen:,.2f}")
+    col4.metric("최소 발전량 (MWh)", f"{min_gen:,.2f}")
 
-    with st.expander(f"상세 데이터 표 보기 ({stat_prefix}별 합계)"):
-        display_df = agg_data.copy()
+    with st.expander("상세 데이터 표 보기 (실제 vs 예측)"):
+        display_df = merged_df.copy()
         if x_axis == '날짜':
             display_df['날짜'] = display_df['날짜'].dt.strftime('%Y-%m-%d')
-        display_df['발전량(MWh)'] = display_df['발전량(MWh)'].round(2)
         
-        # (경고 수정) width='stretch'
+        for col in ['실제 발전량', '예측 발전량']:
+            if col in display_df.columns:
+                 display_df[col] = display_df[col].round(2)
+                 
         st.dataframe(
-            display_df.sort_values(by=x_axis, ascending=False),
+            display_df.sort_values(by=x_axis, ascending=False).set_index(x_axis),
             width='stretch'
         )
+# --- ⬆️ [수정 완료] --- ⬆️
