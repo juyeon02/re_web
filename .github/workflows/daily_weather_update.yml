@@ -36,7 +36,7 @@ jobs:
       # 4. meta.py 스크립트 실행하기
       # (이 스크립트가 '최종_날씨_예측_데이터.csv' 파일을 생성)
       - name: Run weather forecast script
-        run: python meta.py
+        run: python 7일예측api.py
 
       # 5. 변경된 '최종_날씨_예측_데이터.csv' 파일을 GitHub에 다시 저장(Commit)
       - name: Commit and push if changes
