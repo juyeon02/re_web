@@ -1,0 +1,282 @@
+{
+    "경상대태양광": {
+        "데이터수": 1046,
+        "best_params": {
+            "max_depth": null,
+            "max_features": "sqrt",
+            "min_samples_leaf": 2,
+            "min_samples_split": 5,
+            "n_estimators": 500
+        },
+        "cv_mean_R²": 0.8452,
+        "test_R²": 0.8248,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/경상대태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/경상대태양광_tuning_log.txt"
+    },
+    "고흥만수상태양광": {
+        "데이터수": 484,
+        "best_params": {
+            "max_depth": null,
+            "max_features": "sqrt",
+            "min_samples_leaf": 2,
+            "min_samples_split": 5,
+            "n_estimators": 300
+        },
+        "cv_mean_R²": 0.8001,
+        "test_R²": 0.7112,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/고흥만수상태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/고흥만수상태양광_tuning_log.txt"
+    },
+    "광양항세방태양광": {
+        "데이터수": 1068,
+        "best_params": {
+            "max_depth": null,
+            "max_features": "sqrt",
+            "min_samples_leaf": 4,
+            "min_samples_split": 2,
+            "n_estimators": 500
+        },
+        "cv_mean_R²": 0.7974,
+        "test_R²": 0.8293,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/광양항세방태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/광양항세방태양광_tuning_log.txt"
+    },
+    "구미태양광": {
+        "데이터수": 1070,
+        "best_params": {
+            "max_depth": null,
+            "max_features": "sqrt",
+            "min_samples_leaf": 2,
+            "min_samples_split": 5,
+            "n_estimators": 500
+        },
+        "cv_mean_R²": 0.7986,
+        "test_R²": 0.8516,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/구미태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/구미태양광_tuning_log.txt"
+    },
+    "당진태양광": {
+        "데이터수": 1165,
+        "best_params": {
+            "max_depth": 10,
+            "max_features": "sqrt",
+            "min_samples_leaf": 4,
+            "min_samples_split": 2,
+            "n_estimators": 300
+        },
+        "cv_mean_R²": 0.8035,
+        "test_R²": 0.7978,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/당진태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/당진태양광_tuning_log.txt"
+    },
+    "동해바이오화력본부태양광": {
+        "데이터수": 1163,
+        "best_params": {
+            "max_depth": 20,
+            "max_features": "sqrt",
+            "min_samples_leaf": 1,
+            "min_samples_split": 5,
+            "n_estimators": 500
+        },
+        "cv_mean_R²": 0.8236,
+        "test_R²": 0.7939,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/동해바이오화력본부태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/동해바이오화력본부태양광_tuning_log.txt"
+    },
+    "보령태양광": {
+        "데이터수": 700,
+        "best_params": {
+            "max_depth": null,
+            "max_features": "sqrt",
+            "min_samples_leaf": 1,
+            "min_samples_split": 2,
+            "n_estimators": 300
+        },
+        "cv_mean_R²": 0.8381,
+        "test_R²": 0.8125,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/보령태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/보령태양광_tuning_log.txt"
+    },
+    "서울태양광": {
+        "데이터수": 691,
+        "best_params": {
+            "max_depth": 10,
+            "max_features": "sqrt",
+            "min_samples_leaf": 2,
+            "min_samples_split": 2,
+            "n_estimators": 100
+        },
+        "cv_mean_R²": 0.8638,
+        "test_R²": 0.8443,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/서울태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/서울태양광_tuning_log.txt"
+    },
+    "서천태양광": {
+        "데이터수": 698,
+        "best_params": {
+            "max_depth": 20,
+            "max_features": "sqrt",
+            "min_samples_leaf": 1,
+            "min_samples_split": 2,
+            "n_estimators": 500
+        },
+        "cv_mean_R²": 0.859,
+        "test_R²": 0.85,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/서천태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/서천태양광_tuning_log.txt"
+    },
+    "세종태양광": {
+        "데이터수": 700,
+        "best_params": {
+            "max_depth": 10,
+            "max_features": "sqrt",
+            "min_samples_leaf": 1,
+            "min_samples_split": 5,
+            "n_estimators": 500
+        },
+        "cv_mean_R²": 0.898,
+        "test_R²": 0.8416,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/세종태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/세종태양광_tuning_log.txt"
+    },
+    "신보령태양광": {
+        "데이터수": 695,
+        "best_params": {
+            "max_depth": 10,
+            "max_features": "sqrt",
+            "min_samples_leaf": 1,
+            "min_samples_split": 2,
+            "n_estimators": 100
+        },
+        "cv_mean_R²": 0.8392,
+        "test_R²": 0.8334,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/신보령태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/신보령태양광_tuning_log.txt"
+    },
+    "여수엑스포태양광": {
+        "데이터수": 694,
+        "best_params": {
+            "max_depth": null,
+            "max_features": "sqrt",
+            "min_samples_leaf": 2,
+            "min_samples_split": 2,
+            "n_estimators": 500
+        },
+        "cv_mean_R²": 0.8515,
+        "test_R²": 0.9072,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/여수엑스포태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/여수엑스포태양광_tuning_log.txt"
+    },
+    "영흥태양광": {
+        "데이터수": 1087,
+        "best_params": {
+            "max_depth": null,
+            "max_features": "sqrt",
+            "min_samples_leaf": 2,
+            "min_samples_split": 5,
+            "n_estimators": 100
+        },
+        "cv_mean_R²": 0.7479,
+        "test_R²": 0.6949,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/영흥태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/영흥태양광_tuning_log.txt"
+    },
+    "예천태양광": {
+        "데이터수": 1008,
+        "best_params": {
+            "max_depth": 20,
+            "max_features": "sqrt",
+            "min_samples_leaf": 1,
+            "min_samples_split": 10,
+            "n_estimators": 300
+        },
+        "cv_mean_R²": 0.7294,
+        "test_R²": 0.7553,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/예천태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/예천태양광_tuning_log.txt"
+    },
+    "울산태양광#1": {
+        "데이터수": 1157,
+        "best_params": {
+            "max_depth": null,
+            "max_features": "sqrt",
+            "min_samples_leaf": 2,
+            "min_samples_split": 2,
+            "n_estimators": 100
+        },
+        "cv_mean_R²": 0.8439,
+        "test_R²": 0.8146,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/울산태양광#1_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/울산태양광#1_tuning_log.txt"
+    },
+    "인천아시아드태양광": {
+        "데이터수": 235,
+        "best_params": {
+            "max_depth": null,
+            "max_features": "sqrt",
+            "min_samples_leaf": 1,
+            "min_samples_split": 5,
+            "n_estimators": 100
+        },
+        "cv_mean_R²": 0.7268,
+        "test_R²": 0.752,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/인천아시아드태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/인천아시아드태양광_tuning_log.txt"
+    },
+    "인천태양광": {
+        "데이터수": 678,
+        "best_params": {
+            "max_depth": 10,
+            "max_features": "sqrt",
+            "min_samples_leaf": 2,
+            "min_samples_split": 5,
+            "n_estimators": 300
+        },
+        "cv_mean_R²": 0.8254,
+        "test_R²": 0.8241,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/인천태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/인천태양광_tuning_log.txt"
+    },
+    "제주대태양광": {
+        "데이터수": 678,
+        "best_params": {
+            "max_depth": null,
+            "max_features": "sqrt",
+            "min_samples_leaf": 2,
+            "min_samples_split": 5,
+            "n_estimators": 100
+        },
+        "cv_mean_R²": 0.7748,
+        "test_R²": 0.8051,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/제주대태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/제주대태양광_tuning_log.txt"
+    },
+    "제주성읍리태양광": {
+        "데이터수": 700,
+        "best_params": {
+            "max_depth": 20,
+            "max_features": "sqrt",
+            "min_samples_leaf": 2,
+            "min_samples_split": 2,
+            "n_estimators": 300
+        },
+        "cv_mean_R²": 0.726,
+        "test_R²": 0.7299,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/제주성읍리태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/제주성읍리태양광_tuning_log.txt"
+    },
+    "제주태양광": {
+        "데이터수": 698,
+        "best_params": {
+            "max_depth": null,
+            "max_features": "sqrt",
+            "min_samples_leaf": 1,
+            "min_samples_split": 5,
+            "n_estimators": 300
+        },
+        "cv_mean_R²": 0.8588,
+        "test_R²": 0.827,
+        "csv": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/results/hyperparameter_tuning/details/제주태양광_tuning_results.csv",
+        "log": "/Users/parkhyeji/Desktop/PV/src/models/individual/random_forest/logs/hyperparameter_tuning/제주태양광_tuning_log.txt"
+    }
+}

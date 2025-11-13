@@ -1,0 +1,27 @@
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:               발전량(MWh)   R-squared:                       0.683
+Model:                            OLS   Adj. R-squared:                  0.679
+Method:                 Least Squares   F-statistic:                     166.0
+Date:                Wed, 12 Nov 2025   Prob (F-statistic):           2.22e-57
+Time:                        13:52:17   Log-Likelihood:                -491.61
+No. Observations:                 235   AIC:                             991.2
+Df Residuals:                     231   BIC:                             1005.
+Df Model:                           3                                         
+Covariance Type:            nonrobust                                         
+==============================================================================
+                 coef    std err          t      P>|t|      [0.025      0.975]
+------------------------------------------------------------------------------
+const          7.9304      0.129     61.492      0.000       7.676       8.185
+평균습도          -0.7323      0.142     -5.170      0.000      -1.011      -0.453
+총적설량          -0.3868      0.129     -2.989      0.003      -0.642      -0.132
+일조시간           2.4409      0.142     17.235      0.000       2.162       2.720
+==============================================================================
+Omnibus:                       44.523   Durbin-Watson:                   1.139
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):              129.651
+Skew:                          -0.796   Prob(JB):                     7.02e-29
+Kurtosis:                       6.272   Cond. No.                         1.56
+==============================================================================
+
+Notes:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
