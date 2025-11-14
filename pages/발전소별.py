@@ -6,7 +6,7 @@ import plotly.express as px
 from streamlit_folium import st_folium
 
 st.set_page_config(layout="wide")
-st.title("🏭 발전소별 상세 분석")
+st.title("발전소별 상세 분석")
 
 # --------------------------
 # 데이터 로드
@@ -138,5 +138,5 @@ st.plotly_chart(fig, use_container_width=True)
 # --------------------------
 # 데이터 테이블
 # --------------------------
-with st.expander("📄 상세 데이터"):
+with st.expander("상세 데이터"):
     st.dataframe(merged, use_container_width=True)

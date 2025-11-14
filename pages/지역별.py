@@ -5,7 +5,7 @@ from streamlit_folium import st_folium
 import plotly.express as px
 
 st.set_page_config(layout="wide")
-st.title("🌍 지역별 태양광 발전량 분석")
+st.title("지역별 태양광 발전량 분석")
 
 # 공통 CSS 적용
 st.markdown("""
