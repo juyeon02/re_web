@@ -11,8 +11,8 @@ import plotly.express as px
 st.set_page_config(layout="wide")
 st.title("☀️ 태양광 발전량 대시보드 ☀️")
 
-# web_utils.load_data() 호출
-df_locations, df_generation, df_region_solar, korea_geojson, df_today_forecast, df_region_solar_monthly = web_utils.load_data()
+# ❗️ [수정] 7번째 반환값(df_past_forecast) 추가
+df_locations, df_generation, df_region_solar, korea_geojson, df_today_forecast, df_region_solar_monthly, df_past_forecast = web_utils.load_data()
 
 # '오늘 날짜'의 예측 데이터를 찾음
 df_current_weather, weather_data_available = web_utils.process_weather_data(df_today_forecast, df_locations)
@@ -92,7 +92,7 @@ if not df_today_forecast.empty:
                 '일사량': '일사량(MJ/m²)',
                 '평균운량': '평균운량(%)',
                 '평균기온': '평균기온(°C)',
-                '총강수량': '총강수량(mm)',
+                '총강수S량': '총강수량(mm)',
                 '일조시간': '일조시간(h)',
                 '평균풍속': '평균풍속(m/s)',
                 '총적설량': '총적설량(cm)'
