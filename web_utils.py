@@ -1,265 +1,300 @@
-# web_utils.py
 import streamlit as st
 import pandas as pd
 import folium
 import json
-import datetime
 import copy
 import glob
 import os
+from datetime import date 
+from retry_requests import retry 
+import requests_cache
+import numpy as np
+import joblib 
+import pickle
 
-# ---------------------------------------------------------------
-# 1. 데이터 로드 (캐싱)
-# ---------------------------------------------------------------
+# --------------------------------------------------------------
+# 1. 데이터 로드 (함수)
+# --------------------------------------------------------------
 @st.cache_data
 def load_data():
+
+    # -----------------------------
+    # 발전소 위치 데이터
+    # -----------------------------
     try:
-        # 위치 정보
         df_locations = pd.read_csv("data/locations_원본.csv")
-        df_locations['발전기명'] = df_locations['발전기명'].str.strip()
+        df_locations["발전기명"] = df_locations["발전기명"].str.strip()
+        
+        # ❗️ [수정] 발전사 컬럼의 앞뒤 공백과 내부 공백을 모두 제거 (강력한 정제)
+        df_locations["발전사"] = df_locations["발전사"].str.strip().str.replace(' ', '') 
+    except FileNotFoundError:
+        st.error("오류: data/locations_원본.csv 파일을 찾을 수 없습니다.")
+        st.stop()
 
-        # 실제 발전량
+
+    # -----------------------------
+    # 실제 발전량 데이터
+    # -----------------------------
+    try:
         df_generation = pd.read_csv("data/발전량.csv")
-        df_generation['날짜'] = pd.to_datetime(df_generation['날짜'], format='%Y.%m.%d')
+        df_generation["날짜"] = pd.to_datetime(df_generation["날짜"], format="%Y.%m.%d")
+    except FileNotFoundError:
+        st.error("오류: data/발전량.csv 파일을 찾을 수 없습니다.")
+        st.stop()
+    except ValueError:
+        st.error("오류: data/발전량.csv의 날짜 형식이 'YYYY.M.D'가 아닙니다.")
+        st.stop()
 
-        # ------------------------------------------
-        # 지역별 연도·월 태양광 데이터 로드
-        # ------------------------------------------
-        path = "solar_analysis/"
-        file_list = glob.glob(os.path.join(path, "*_solar_utf8.csv"))
 
-        if not file_list:
-            st.error("⚠ solar_analysis 폴더에서 태양광 파일을 찾을 수 없습니다.")
-            st.stop()
+    # -----------------------------
+    # 태양광 데이터(연/월별) - Choropleth Map 용
+    # -----------------------------
+    path = "solar_analysis/"
+    file_list = glob.glob(os.path.join(path, "*_solar_utf8.csv"))
 
-        all_solar_data = []
-
-        for file_path in file_list:
-            filename = os.path.basename(file_path)
-
+    all_solar = []
+    
+    if not file_list:
+        st.warning("경고: solar_analysis 폴더에 태양광 CSV 파일이 없습니다.")
+        df_region_solar_monthly = pd.DataFrame()
+        df_region_solar = pd.DataFrame()
+    else:
+        for file in file_list:
             try:
-                year = int(filename.split('_')[0])
+                year = int(os.path.basename(file).split("_")[0])
             except:
                 continue
 
-            df = pd.read_csv(file_path)
-            df = df.rename(columns={'구분': '광역지자체'})
-            df['광역지자체'] = df['광역지자체'].str.strip()
+            df = pd.read_csv(file)
+            df = df.rename(columns={"구분": "광역지자체"})
+            df["광역지자체"] = df["광역지자체"].str.strip()
 
-            month_cols = [f"{i}월" for i in range(1, 12 + 1)]
+            month_cols = [f"{i}월" for i in range(1, 13)]
 
-            for col in month_cols:
-                if col in df.columns:
-                    df[col] = (
-                        df[col]
-                        .astype(str)
-                        .str.replace(",", "")
-                        .replace("", "0")
-                    )
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
+            for c in month_cols:
+                if c in df.columns:
+                    df[c] = df[c].astype(str).str.replace(",", "")
+                    df[c] = pd.to_numeric(df[c], errors="coerce")
 
             df_long = df.melt(
-                id_vars=['광역지자체'],
+                id_vars=["광역지자체"],
                 value_vars=month_cols,
-                var_name='월',
-                value_name='태양광'
+                var_name="월",
+                value_name="태양광",
             )
 
-            df_long['연도'] = year
-            df_long['월'] = df_long['월'].str.replace("월", "").astype(int)
+            df_long["연도"] = year
+            df_long["월"] = df_long["월"].str.replace("월", "").astype(int)
 
-            all_solar_data.append(df_long)
+            all_solar.append(df_long)
 
-        df_region_solar_monthly = pd.concat(all_solar_data, ignore_index=True)
+        df_region_solar_monthly = pd.concat(all_solar, ignore_index=True)
 
-        df_region_solar_annual = df_region_solar_monthly.groupby(
-            ['연도', '광역지자체']
-        )['태양광'].sum().reset_index()
-
-        # ------------------------------------------
-        # GeoJSON 로드
-        # ------------------------------------------
-        with open('data/korea_geojson.json', 'r', encoding='utf-8') as f:
-            korea_geojson = json.load(f)
-
-    except Exception as e:
-        st.error(f"❌ 데이터 로드 오류: {e}")
-        st.stop()
-
-    # ------------------------------------------
-    # 7일 예측 데이터 로드
-    # ------------------------------------------
+        df_region_solar = (
+            df_region_solar_monthly.groupby(["연도", "광역지자체"])["태양광"]
+            .sum()
+            .reset_index()
+        )
+    
+    # -----------------------------
+    # 지도 geojson
+    # -----------------------------
     try:
-        df_today_forecast = pd.read_csv("최종_일별_발전량_예측.csv", parse_dates=['날짜'])
-
-        if '날짜' in df_today_forecast.columns:
-            # timezone 제거
-            df_today_forecast['날짜'] = df_today_forecast['날짜'].dt.tz_localize(None)
-
+        with open("data/korea_geojson.json", "r", encoding="utf-8") as f:
+            korea_geojson = json.load(f)
     except FileNotFoundError:
-        st.warning("⚠ '최종_일별_발전량_예측.csv' 파일 없음")
+        korea_geojson = {}
+        st.error("오류: korea_geojson.json 파일을 찾을 수 없습니다.")
+        st.stop()
+        
+    # -----------------------------
+    # 미래/과거 예측 파일 로드
+    # -----------------------------
+    try:
+        df_today_forecast = pd.read_csv("최종_일별_발전량_예측.csv", parse_dates=["날짜"])
+        if '날짜' in df_today_forecast.columns:
+            df_today_forecast["날짜"] = df_today_forecast["날짜"].dt.tz_localize(None)
+    except:
         df_today_forecast = pd.DataFrame()
 
-    # ------------------------------------------
-    # 과거 예측 데이터 (예측 vs 실제 비교용)
-    # ------------------------------------------
     try:
         df_past_forecast = pd.read_csv(
-            "data/최종_과거_예측_데이터.csv", parse_dates=['날짜']
+            "data/최종_과거_예측_데이터.csv", parse_dates=["날짜"]
         )
         if '날짜' in df_past_forecast.columns:
-            df_past_forecast['날짜'] = df_past_forecast['날짜'].dt.tz_localize(None)
-
+            df_past_forecast["날짜"] = df_past_forecast["날짜"].dt.tz_localize(None)
     except:
-        st.warning("⚠ '최종_과거_예측_데이터.csv' 파일 없음")
         df_past_forecast = pd.DataFrame()
 
-    # ------------------------------------------
     return (
         df_locations,
         df_generation,
-        df_region_solar_annual,
+        df_region_solar,
         korea_geojson,
         df_today_forecast,
         df_region_solar_monthly,
-        df_past_forecast
+        df_past_forecast,
     )
 
 
-# ---------------------------------------------------------------
-# 2. 날씨 데이터 처리
-# ---------------------------------------------------------------
+# --------------------------------------------------------------
+# 2. 오늘 예측 날씨 처리
+# --------------------------------------------------------------
 def process_weather_data(df_today_forecast, df_locations):
-    weather_data_available = False
-    df_current_weather = pd.DataFrame()
 
-    if not df_today_forecast.empty:
-        try:
-            today = pd.Timestamp.now().date()
+    if df_today_forecast.empty:
+        return pd.DataFrame(), False
 
-            df_current_weather = df_today_forecast[
-                df_today_forecast['날짜'].dt.date == today
-            ].copy()
+    today = pd.Timestamp.now().date()
 
-            if not df_current_weather.empty:
-                df_current_weather = pd.merge(
-                    df_current_weather,
-                    df_locations[['발전기명', '발전사']],
-                    on='발전기명',
-                    how='left'
-                )
-                weather_data_available = True
+    # 오늘 날짜 데이터 필터
+    df = df_today_forecast[df_today_forecast["날짜"].dt.date == today].copy()
 
-        except Exception as e:
-            st.error(f"❌ 날씨 데이터 처리 오류: {e}")
+    # 발전사 + 위도/경도 + 설비용량 추가
+    location_info_subset = df_locations[["발전기명", "발전사", "설비용량(MW)"]]
 
-    return df_current_weather, weather_data_available
-
-
-# ---------------------------------------------------------------
-# 3. 발전소 라벨 디자인 (지도용)
-# ---------------------------------------------------------------
-def create_weather_icon(row):
-    temp = row.get("평균기온", 0)
-    predict = row.get("발전량_예측(MWh)", 0)
-
-    html = f"""
-    <div style="
-        font-family: 'Noto Sans KR', sans-serif;
-        background-color: rgba(255, 255, 255, 0.85);
-        border-radius: 8px;
-        padding: 6px 8px;
-        border: 1px solid #666;
-        box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
-        text-align: center;
-        width: 120px;">
-        <b style="font-size:13px;">{row['발전기명']}</b><br>
-        ⚡ {predict:.2f} MWh<br>
-        🌡 {temp:.1f} °C
-    </div>
-    """
-
-    return folium.DivIcon(
-        html=html,
-        icon_size=(120, 60),
-        icon_anchor=(60, 30)
+    df = df.merge(
+        location_info_subset,
+        on="발전기명",
+        how="left"
     )
 
+    # 위도/경도 누락되면 지도 못 그림 (forecast 파일의 위도/경도 사용)
+    df = df.dropna(subset=["위도", "경도"]) 
 
-# ---------------------------------------------------------------
-# 4. 지역 Choropleth 지도
-# ---------------------------------------------------------------
-def draw_choropleth_map(korea_geojson, map_data, legend_title):
-    m = folium.Map(location=[36.5, 127.5], zoom_start=7)
+    return df, (not df.empty)
 
-    if map_data.empty:
-        st.warning("⚠ 지도에 표시할 데이터가 없습니다.")
-        return m
+
+# --------------------------------------------------------------
+# 3. 지역별 색상 지도 (툴팁 정상 작동)
+# --------------------------------------------------------------
+def draw_choropleth_map(geojson, map_data, legend_title):
+
+    m = folium.Map(location=[36.5, 127.5], zoom_start=7, tiles="OpenStreetMap")
+    gj = copy.deepcopy(geojson)
 
     name_map = {
-        '서울': 'Seoul', '부산': 'Busan', '대구': 'Daegu',
-        '인천': 'Incheon', '광주': 'Gwangju', '대전': 'Daejeon',
-        '울산': 'Ulsan', '세종': 'Sejong',
-        '경기': 'Gyeonggi-do', '경기도': 'Gyeonggi-do',
-        '강원': 'Gangwon-do', '강원특별자치도': 'Gangwon-do',
-        '충북': 'Chungcheongbuk-do', '충청북도': 'Chungcheongbuk-do',
-        '충남': 'Chungcheongnam-do', '충청남도': 'Chungcheongnam-do',
-        '전북': 'Jeollabuk-do', '전라북도': 'Jeollabuk-do',
-        '전남': 'Jeollanam-do', '전라남도': 'Jeollanam-do',
-        '경북': 'Gyeongsangbuk-do', '경상북도': 'Gyeongsangbuk-do',
-        '경남': 'Gyeongsangnam-do', '경상남도': 'Gyeongsangnam-do',
-        '제주': 'Jeju', '제주특별자치도': 'Jeju'
+        "서울": "Seoul", "부산": "Busan", "대구": "Daegu", "인천": "Incheon",
+        "광주": "Gwangju", "대전": "Daejeon", "울산": "Ulsan", "세종": "Sejong",
+        "경기": "Gyeonggi-do", "강원": "Gangwon-do", "충북": "Chungcheongbuk-do",
+        "충남": "Chungcheongnam-do", "전북": "Jeollabuk-do", "전남": "Jeollanam-do",
+        "경북": "Gyeongsangbuk-do", "경남": "Gyeongsangnam-do", "제주": "Jeju",
     }
+    
+    map_data["광역지자체_clean"] = map_data["광역지자체"].apply(lambda x: x.split("도")[0].split("특별시")[0].split("광역시")[0].split("특별자치시")[0].split("특별자치도")[0].split("시")[0].strip())
+    
+    map_data["geojson_name"] = map_data["광역지자체_clean"].map(name_map)
+    map_data = map_data.dropna(subset=['geojson_name']) 
 
-    df = map_data.copy()
-    df['geojson_name'] = df['광역지자체'].map(name_map)
+    value_map = map_data.set_index("geojson_name")["태양광"]
+    ko_map = map_data.set_index("geojson_name")["광역지자체_clean"]
 
-    data_dict = df.set_index('geojson_name')['태양광']
+    for f in gj["features"]:
+        name = f["properties"]["NAME_1"]
+        f["properties"]["태양광"] = float(value_map.get(name, 0))
+        f["properties"]["KOREAN_NAME"] = ko_map.get(name, "")
 
-    gjson = copy.deepcopy(korea_geojson)
-    for feature in gjson['features']:
-        name = feature['properties']['NAME_1']
-        feature['properties']['value'] = float(data_dict.get(name, 0))
-
-    folium.Choropleth(
-        geo_data=gjson,
-        data=df,
-        columns=['geojson_name', '태양광'],
+    c = folium.Choropleth(
+        geo_data=gj,
         key_on="feature.properties.NAME_1",
+        data=map_data,
+        columns=["geojson_name", "태양광"],
         fill_color="YlOrRd",
-        fill_opacity=0.8,
-        line_opacity=0.2,
-        legend_name=legend_title
+        fill_opacity=0.7,
+        line_opacity=0.3,
+        legend_name=legend_title,
     ).add_to(m)
+
+    folium.GeoJsonTooltip(
+        fields=["KOREAN_NAME", "태양광"],
+        aliases=["지역:", "발전량(MWh):"],
+        sticky=True,
+        labels=True,
+        style="background:white; padding:5px; border:1px solid black; border-radius:4px;",
+    ).add_to(c.geojson)
 
     return m
 
 
-# ---------------------------------------------------------------
-# 5. 발전소별 날씨 지도
-# ---------------------------------------------------------------
-def draw_plant_weather_map(df_current_weather, available, company_filter):
+# --------------------------------------------------------------
+# 4. 발전소 날씨 지도 (3개 발전사 색상 적용 + 팝업 정보)
+# --------------------------------------------------------------
+# 팝업 아이콘 생성 함수 (HTML 마커)
+def create_weather_icon(row):
+    temp = row.get('평균기온', 0)
+    prediction = row.get('발전량_예측(MWh)', 0)
+
+    html = f"""
+    <div style="font-family: 'Arial', sans-serif;
+                background-color: rgba(255, 255, 255, 0.85); 
+                border: 1px solid #777; 
+                border-radius: 5px; 
+                padding: 5px 8px; 
+                font-size: 11px; 
+                text-align: center;
+                box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+                width: 110px; 
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;">
+        <strong style="font-size: 13px; color: #333;">{row['발전기명']}</strong><br>
+        <span style="color: #E67E22; font-weight: bold;">⚡ {prediction:.2f} MWh</span><br>
+        <span style="color: #C0392B;">🌡️ {temp:.1f} °C (평균)</span>
+    </div>
+    """
+    return folium.features.DivIcon(
+        icon_size=(120, 60), icon_anchor=(60, 30), html=html
+    )
+
+# 지도 그리는 메인 함수
+def draw_plant_weather_map(df, available, company):
+
+    # 발전사별 마커 색상
+    COLOR_MAP = {
+        "한국남동발전": "red",
+        "한국동서발전": "blue",
+        "한국중부발전": "green",
+    }
+
     m = folium.Map(location=[36.5, 127.5], zoom_start=7)
 
-    if not available:
-        st.warning("⚠ 오늘 예측 데이터가 없습니다.")
-        return m, None
+    if not available or df.empty:
+        return m, df
 
-    if company_filter != "전체":
-        df_draw = df_current_weather[df_current_weather['발전사'] == company_filter]
-    else:
-        df_draw = df_current_weather
+    # 회사 필터
+    if company != "전체":
+        df = df[df["발전사"] == company]
 
-    if df_draw.empty:
-        st.info("⚠ 해당 발전사 데이터 없음")
-        return m, None
+    if df.empty:
+        st.info(f"선택한 '{company}'의 발전소에 대한 데이터가 없습니다.")
+        return m, df
 
-    for _, row in df_draw.iterrows():
-        icon = create_weather_icon(row)
+    # 지도 중심을 발전소 평균 위치로 이동
+    m.location = [df["위도"].mean(), df["경도"].mean()]
+    m.zoom_start = 8 if company != "전체" else 7
+
+    # 마커 생성
+    for _, row in df.iterrows():
+        color_key = row["발전사"] 
+
+        color = COLOR_MAP.get(color_key, "gray")
+
+        # 팝업 내용 정의
+        popup_html = (
+            f"<b>{row['발전기명']}</b><br>"
+            f"발전량 예측: {row['발전량_예측(MWh)']:.2f} MWh<br>"
+            f"평균기온: {row.get('평균기온', 0):.1f} °C<br>"
+            f"일사량: {row.get('일사량', 0):.2f} MJ/m²"
+        )
+
+        # 팝업 객체 생성 및 최대 너비 설정 (가로로 길게 보이게 함)
+        popup_obj = folium.Popup(popup_html, max_width=350) 
+        
         folium.Marker(
-            location=[row['위도'], row['경도']],
-            tooltip=row['발전기명'],
-            icon=icon
+            location=[row["위도"], row["경도"]],
+            tooltip=row["발전기명"],
+            popup=popup_obj, # ❗️ 팝업 객체 사용
+            icon=folium.Icon(color=color, icon="bolt", prefix="fa"),
         ).add_to(m)
 
-    return m, df_draw
+    return m, df
