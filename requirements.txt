@@ -1,6 +1,8 @@
 streamlit
 pandas
+numpy
 plotly
+matplotlib
 folium
 streamlit-folium
 requests
@@ -9,3 +11,4 @@ openmeteo-requests
 requests-cache
 retry-requests
 scikit-learn
+joblib

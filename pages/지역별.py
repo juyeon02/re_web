@@ -1,12 +1,10 @@
 import streamlit as st
 st.set_page_config(layout="wide")
-
 import web_utils
 from streamlit_folium import st_folium
 import plotly.express as px
 
 st.title("🌍 지역별 태양광 발전량 분석")
-
 (
     df_locations,
     df_generation,
@@ -39,17 +37,13 @@ else:
     ]
     legend = f"{selected_year}년 {selected_month} 태양광 발전량"
 
-# ---------------------------------------------------
 # 지도 출력
-# ---------------------------------------------------
 st.subheader(legend)
 
 m_choro = web_utils.draw_choropleth_map(korea_geojson, map_data, legend)
 st_folium(m_choro, width="100%", height=600)
 
-# ---------------------------------------------------
 # 상세 데이터
-# ---------------------------------------------------
 with st.expander("📊 상세 데이터 보기"):
     sorted_data = map_data.sort_values("태양광", ascending=False)
 
@@ -61,6 +55,7 @@ with st.expander("📊 상세 데이터 보기"):
         color="태양광",
         color_continuous_scale="YlOrRd",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
-    st.dataframe(sorted_data, use_container_width=True)
+    st.dataframe(sorted_data, width='stretch')
+

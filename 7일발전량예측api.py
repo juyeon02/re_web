@@ -3,9 +3,8 @@ import pandas as pd
 import requests_cache
 from retry_requests import retry
 import os
-import joblib  # ✅ pickle 대신 joblib 사용 (scikit-learn 호환성 더 좋음)
+import joblib  
 
-# --- 1. 로케이션 파일 먼저 불러오기 ---
 location_file = "data/locations_원본.csv"
 if not os.path.exists(location_file):
     print(f"오류: '{location_file}' 파일을 찾을 수 없습니다.")
@@ -22,13 +21,13 @@ if not all(col in location_df.columns for col in required_cols):
     print(f"(현재 컬럼: {location_df.columns.tolist()})")
     exit()
 
-# 모델 학습에 사용된 변수 (순서 중요!)
+# 모델 학습에 사용된 변수
 MODEL_FEATURES = [
     '설비용량(MW)', '평균기온', '평균습도', '총강수량', '총적설량',
     '평균풍속', '일조시간', '일사량', '평균운량'
 ]
 
-# --- 2. Open-Meteo API 설정 ---
+# Open-Meteo API 설정
 cache_session = requests_cache.CachedSession('.cache', expire_after=3600)
 retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
 openmeteo = openmeteo_requests.Client(session=retry_session)
@@ -48,7 +47,7 @@ all_dataframes = []
 
 print("날씨 API (Forecast-Daily) 데이터 처리 중...")
 
-# --- 3. 데이터 처리 ---
+# 데이터 처리
 for i, response in enumerate(responses):
     daily = response.Daily()
     daily_data = {
@@ -83,7 +82,7 @@ for i, response in enumerate(responses):
     # --- 모델 예측 ---
     if os.path.exists(model_path):
         try:
-            # ✅ joblib으로 로드 (pickle보다 안정적)
+
             loaded_model = joblib.load(model_path)
 
             X_test = daily_df[MODEL_FEATURES].apply(pd.to_numeric, errors='coerce').fillna(0)
@@ -102,12 +101,12 @@ for i, response in enumerate(responses):
 
     all_dataframes.append(daily_df)
 
-# --- 4. 데이터 통합 및 저장 ---
+# 데이터 통합 및 저장
 print("날씨 API 데이터 처리 완료. 데이터 통합 및 저장 중...")
 
 final_df = pd.concat(all_dataframes, ignore_index=True)
 
-# --- 5. 컬럼 정리 ---
+# 컬럼 정리
 final_columns = [
     '날짜', '발전기명', '설비용량(MW)', '발전량_예측(MWh)',
     '평균기온', '평균습도', '총강수량', '총적설량', '평균풍속',
@@ -115,8 +114,8 @@ final_columns = [
 ]
 final_df = final_df[[col for col in final_columns if col in final_df.columns]]
 
-# --- 6. 파일 저장 ---
-output_filename = "최종_일별_발전량_예측.csv"
+# 파일 저장
+output_filename = "data/최종_일별_발전량_예측.csv"
 final_df.to_csv(output_filename, index=False, encoding='utf-8-sig')
 
-print(f"\n🎉 작업 완료! '{output_filename}' 파일로 저장되었습니다.")
+print(f"\n  '{output_filename}' 파일로 저장되었습니다.")

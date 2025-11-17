@@ -12,50 +12,32 @@ import numpy as np
 import joblib 
 import pickle
 
-# --------------------------------------------------------------
-# 1. 데이터 로드 (함수)
-# --------------------------------------------------------------
+# 1. 데이터 로드 
 @st.cache_data
 def load_data():
-
-    # -----------------------------
-    # 발전소 위치 데이터
-    # -----------------------------
-    try:
+    try:         # 발전소 위치 데이터
         df_locations = pd.read_csv("data/locations_원본.csv")
         df_locations["발전기명"] = df_locations["발전기명"].str.strip()
-        
-        # ❗️ [수정] 발전사 컬럼의 앞뒤 공백과 내부 공백을 모두 제거 (강력한 정제)
         df_locations["발전사"] = df_locations["발전사"].str.strip().str.replace(' ', '') 
     except FileNotFoundError:
         st.error("오류: data/locations_원본.csv 파일을 찾을 수 없습니다.")
         st.stop()
 
-
-    # -----------------------------
-    # 실제 발전량 데이터
-    # -----------------------------
-    try:
+    try:          # 실제 발전량 데이터
         df_generation = pd.read_csv("data/발전량.csv")
         df_generation["날짜"] = pd.to_datetime(df_generation["날짜"], format="%Y.%m.%d")
     except FileNotFoundError:
         st.error("오류: data/발전량.csv 파일을 찾을 수 없습니다.")
         st.stop()
-    except ValueError:
-        st.error("오류: data/발전량.csv의 날짜 형식이 'YYYY.M.D'가 아닙니다.")
-        st.stop()
 
-
-    # -----------------------------
     # 태양광 데이터(연/월별) - Choropleth Map 용
-    # -----------------------------
-    path = "solar_analysis/"
+    path ="data/solar_analysis"
     file_list = glob.glob(os.path.join(path, "*_solar_utf8.csv"))
 
     all_solar = []
     
     if not file_list:
-        st.warning("경고: solar_analysis 폴더에 태양광 CSV 파일이 없습니다.")
+        st.warning("경고: data/solar_analysis폴더에 CSV 파일이 없습니다.")
         df_region_solar_monthly = pd.DataFrame()
         df_region_solar = pd.DataFrame()
     else:
@@ -111,7 +93,7 @@ def load_data():
     # 미래/과거 예측 파일 로드
     # -----------------------------
     try:
-        df_today_forecast = pd.read_csv("최종_일별_발전량_예측.csv", parse_dates=["날짜"])
+        df_today_forecast = pd.read_csv("data/최종_일별_발전량_예측.csv", parse_dates=["날짜"])
         if '날짜' in df_today_forecast.columns:
             df_today_forecast["날짜"] = df_today_forecast["날짜"].dt.tz_localize(None)
     except:
@@ -137,9 +119,7 @@ def load_data():
     )
 
 
-# --------------------------------------------------------------
 # 2. 오늘 예측 날씨 처리
-# --------------------------------------------------------------
 def process_weather_data(df_today_forecast, df_locations):
 
     if df_today_forecast.empty:
@@ -150,7 +130,7 @@ def process_weather_data(df_today_forecast, df_locations):
     # 오늘 날짜 데이터 필터
     df = df_today_forecast[df_today_forecast["날짜"].dt.date == today].copy()
 
-    # 발전사 + 위도/경도 + 설비용량 추가
+    # 발전사 + 위도/경도 + 설비용량
     location_info_subset = df_locations[["발전기명", "발전사", "설비용량(MW)"]]
 
     df = df.merge(
@@ -165,9 +145,7 @@ def process_weather_data(df_today_forecast, df_locations):
     return df, (not df.empty)
 
 
-# --------------------------------------------------------------
 # 3. 지역별 색상 지도 (툴팁 정상 작동)
-# --------------------------------------------------------------
 def draw_choropleth_map(geojson, map_data, legend_title):
 
     m = folium.Map(location=[36.5, 127.5], zoom_start=7, tiles="OpenStreetMap")
@@ -215,11 +193,7 @@ def draw_choropleth_map(geojson, map_data, legend_title):
 
     return m
 
-
-# --------------------------------------------------------------
-# 4. 발전소 날씨 지도 (3개 발전사 색상 적용 + 팝업 정보)
-# --------------------------------------------------------------
-# 팝업 아이콘 생성 함수 (HTML 마커)
+# 4. 발전소 날씨 지도 
 def create_weather_icon(row):
     temp = row.get('평균기온', 0)
     prediction = row.get('발전량_예측(MWh)', 0)
@@ -246,7 +220,6 @@ def create_weather_icon(row):
         icon_size=(120, 60), icon_anchor=(60, 30), html=html
     )
 
-# 지도 그리는 메인 함수
 def draw_plant_weather_map(df, available, company):
 
     # 발전사별 마커 색상

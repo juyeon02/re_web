@@ -1,16 +1,11 @@
-# GitHub Actions 워크플로우의 이름
-name: 매일 날씨 예보 업데이트
+name: 날씨 예보 업데이트
 
-# 이 워크플로우가 언제 실행될지 정의
 on:
-  # 1. 매일 00:00 UTC (한국 시간 오전 9시)에 자동으로 실행
+  # 1. 매일 (한국 시간)오전 9시에 자동으로 실행
   schedule:
     - cron: '0 0 * * *'
-  
-  # 2. GitHub의 'Actions' 탭에서 수동으로 실행할 수 있도록 버튼 추가
   workflow_dispatch:
 
-# 실제 실행될 작업들
 jobs:
   update-weather-data:
     # 'ubuntu'라는 리눅스 서버에서 실행
@@ -34,7 +29,6 @@ jobs:
           pip install -r requirements.txt
       
       # 4. meta.py 스크립트 실행하기
-      # (이 스크립트가 '최종_일별_발전량_예측.csv' 파일을 생성)
       - name: Run weather forecast script
         run: python 7일발전량예측api.py
 
@@ -45,4 +39,4 @@ jobs:
           # 커밋 메시지 설정
           commit_message: '날씨: 매일 예보 데이터 자동 업데이트'
           # 변경 사항을 감지할 파일 이름
-          file_pattern: '최종_일별_발전량_예측.csv'
+          file_pattern: 'data/최종_일별_발전량_예측.csv'

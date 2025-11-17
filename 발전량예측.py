@@ -1,6 +1,5 @@
 import streamlit as st
 st.set_page_config(page_title="발전량 예측", layout="wide")
-
 from streamlit_folium import st_folium
 import web_utils
 import plotly.express as px
@@ -35,13 +34,9 @@ st.title("☀️ 태양광 발전량 대시보드")
 
 df_today, available = web_utils.process_weather_data(df_today_forecast, df_locations)
 
-# ----------------------------------------------------
-# 1. 오늘 발전량 지도
-# ----------------------------------------------------
-st.header("오늘 발전량 예측")
 
-# -----------------------------------------------------------------
-# ⬇️ --- [신규] 설명 섹션 추가 --- ⬇️
+# 1. 오늘 발전량 지도
+st.header("오늘 발전량 예측")
 with st.expander("대시보드 설명 및 데이터 안내", expanded=False):
     st.markdown("""
         ### 지도 마커 색상 (발전사 구분)
@@ -65,9 +60,7 @@ map_weather, _ = web_utils.draw_plant_weather_map(df_today, available, "전체")
 st_folium(map_weather, width="100%", height=500)
 
 
-# ----------------------------------------------------
-# 2. 7일 예측
-# ----------------------------------------------------
+# 7일 예측
 st.divider()
 st.header("📈 7일 발전량 예측")
 
@@ -91,11 +84,11 @@ else:
         df_p, x="날짜_str", y="발전량_예측(MWh)",
         markers=True, title=f"{selected} – 7일간 예측 추이"
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     with st.expander("상세 데이터 보기"):
         df_show = df_p.copy()
         df_show["날짜"] = df_show["날짜"].dt.strftime("%Y-%m-%d")
-        st.dataframe(df_show.set_index("날짜"), use_container_width=True)
+        st.dataframe(df_show.set_index("날짜"),width='stretch')
 
 st.sidebar.info("왼쪽 메뉴에서 지역별 · 발전소별 상세 페이지를 확인하세요.")

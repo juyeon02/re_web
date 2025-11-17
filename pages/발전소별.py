@@ -8,14 +8,10 @@ from streamlit_folium import st_folium
 st.set_page_config(layout="wide")
 st.title("🏭 발전소별 상세 (날씨 지도 및 그래프)")
 
-# ❗️ [수정] web_utils.load_data() 호출
 df_locations, df_generation, df_region_solar, korea_geojson, df_today_forecast, df_region_solar_monthly, df_past_forecast = web_utils.load_data()
-
-# ❗️ [수정] web_utils.process_weather_data() 호출
 df_current_weather, weather_data_available = web_utils.process_weather_data(df_today_forecast, df_locations)
 
 # -----------------------------------------------------------------
-# ⬇️ --- [신규] 설명 섹션 추가 --- ⬇️
 with st.expander("대시보드 설명 및 데이터 안내", expanded=False):
     st.markdown("""
         ### 지도 마커 색상 (발전사 구분)
@@ -33,9 +29,7 @@ with st.expander("대시보드 설명 및 데이터 안내", expanded=False):
         ---
         **데이터 출처:** Open-Meteo API (기상), 자체 Random Forest 모델 (발전량 예측)
     """)
-# ⬆️ --- [신규] 설명 섹션 추가 끝 --- ⬆️
 # -----------------------------------------------------------------
-
 
 st.header("발전소별 상세 (날씨 지도 및 그래프)")
 
@@ -77,21 +71,21 @@ st.divider()
 
 st.header(f"📊 {company} 발전량 비교 (예측 vs 실제)")
 
-# 1. '실제' 발전량 데이터 준비 (df_generation)
+# 1. '실제' 발전량 데이터 
 if company == '전체':
     actual_data_base = pd.merge(df_generation, df_locations, on='발전기명')
 else:
     plant_names = df_locations[df_locations['발전사'] == company]['발전기명'].tolist()
     actual_data_base = df_generation[df_generation['발전기명'].isin(plant_names)]
 
-# 2. ❗️ [수정] "과거 예측" 발전량 데이터 준비 (df_past_forecast)
+# 2."과거 예측" 발전량 데이터
 if company == '전체':
     past_forecast_data_base = df_past_forecast.copy()
 else:
     plant_names = df_locations[df_locations['발전사'] == company]['발전기명'].tolist()
     past_forecast_data_base = df_past_forecast[df_past_forecast['발전기명'].isin(plant_names)]
 
-# 3. 지도 클릭 이벤트 처리
+# 3. 지도 클릭
 clicked_plant_name = map_data.get('last_object_clicked_tooltip')
 graph_title_name = company
 
@@ -123,7 +117,6 @@ selected_month = st.sidebar.selectbox('월을 선택하세요:', month_list)
 if selected_month != '전체':
     filtered_actual = filtered_actual[filtered_actual['월'] == selected_month]
 
-# 5. ❗️ [수정] "과거 예측" 데이터도 동일한 기간으로 필터링
 if not past_forecast_data_base.empty:
     past_forecast_data_base['연도'] = past_forecast_data_base['날짜'].dt.year
     past_forecast_data_base['월'] = past_forecast_data_base['날짜'].dt.month
@@ -155,7 +148,7 @@ else:
     
     agg_actual = agg_actual.rename(columns={'발전량(MWh)': '실제 발전량'})
 
-    # 7. ❗️ [수정] "과거 예측" 데이터 집계
+    # 7"과거 예측" 데이터 집계
     if not past_forecast_data_base.empty:
         if x_axis == '날짜':
             agg_forecast = past_forecast_data_base.groupby('날짜')['발전량_예측(MWh)'].sum().reset_index()
@@ -172,7 +165,7 @@ else:
     else: # 예측 데이터가 없는 경우 (과거)
         merged_df = agg_actual
         
-    # 9. 2개 선을 그리기 위해 데이터 프레임 재구성 (Melt)
+    # 9. 2개 선을 그리기 위해 데이터 프레임 재구성
     if '예측 발전량' in merged_df.columns:
         df_melted = merged_df.melt(id_vars=[x_axis], 
                                    value_vars=['실제 발전량', '예측 발전량'], 
@@ -189,7 +182,7 @@ else:
         df_melted, 
         x=x_axis, 
         y='발전량(MWh)',
-        color='데이터 종류', # 👈 2개 선(실제, 예측)을 구분
+        color='데이터 종류', 
         title=f"{graph_title_name} {title_suffix} 발전량 비교",
         markers=True,
         color_discrete_map={'실제 발전량': 'blue', '예측 발전량': 'red'} # 색상 지정
@@ -199,7 +192,7 @@ else:
     
     st.plotly_chart(fig, width='stretch')
 
-    # 11. 요약 통계 ('agg_actual' 사용)
+    # 11. 요약 통계
     st.subheader("📈 '실제' 발전량 요약 통계")
     
     total_gen = agg_actual['실제 발전량'].sum()
